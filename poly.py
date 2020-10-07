@@ -462,20 +462,26 @@ class PolyLattice:
             valid = False
             link = random.choice(potential_pairs)
             all_beads = [bead for beads in accepted_links for bead in beads]
-            while valid:
+            while not valid:
                 # makes sure the links aren't the same
-                cond1 = ((link[0], link[1]) in accepted_links);
-                cond2 = ((link[1], link[0]) in accepted_links)
+                conda = ((link[0], link[1]) in accepted_links)
+                condb = ((link[1], link[0]) in accepted_links)
 
-                if multilink==False:
-                    cond3 = (link[0] in all_beads) or (link[1] in all_beads)
-                    if not (cond1 or cond2 or cond3):
-                        valid = True
-                        link = random.choice(potential_pairs)
-                else:
+                cond1 = not (conda or condb)
+                
+                if multilink==False:            
+                    cond2 = (link[0] in all_beads) or (link[1] in all_beads)
                     if not (cond1 or cond2):
-                        valid = True
                         link = random.choice(potential_pairs)
+                    else:
+                        valid = True
+                else:
+                    if cond1:
+                        valid = False
+                        link = random.choice(potential_pairs)
+                    else:
+                        valid = True
+                
             return link
             
         
@@ -492,7 +498,7 @@ class PolyLattice:
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
         bond = mini*sigma
 
-        # compiling the full list of potential pairs.        
+        # ---------------- compiling the full list of potential pairs. ------------------
         potential_pairs = []        
         for i in range(self.num_walks):
             for bead in self.walk_data(i):
@@ -500,13 +506,15 @@ class PolyLattice:
                     neighbours = self.check_surroundings(bead[-1])
                     for neighbour in neighbours:
                         # considering neighbours that are higher in the index, neighbours are further along the chain
-                        cond1 = ((neighbour[0] > bead[0]) or (neighbour[1] - bead[1] > selflinking)) # not of the same random walk.
+                        # not of the same random walk.
+                        cond1 = ((neighbour[0] > bead[0]) or (neighbour[1] - bead[1] > selflinking)) 
                         cond2 = (np.linalg.norm(neighbour[-1] - bead[-1]) < 2*bond) # within linking distance
                         cond3 = (neighbour[2] not in forbidden) # allowed to link                    
                         
                         if cond1 and cond2 and cond3:
                             potential_pairs.append((neighbour, bead))
-        
+        # -------------------------------------------------------------------------------
+
         if len(potential_pairs) == 0:
             # terminating condition. Extremely useful!
             print("No sites for crosslinking. Simulation will run as planned.")
@@ -516,7 +524,6 @@ class PolyLattice:
             accepted_links = []
             if reaction == True:
                 # this option is taken if chains are linked via an atom (such as sulfur)
-                
                 #-------------------------------------------------------------------------------
                 # The following algorithm
                 #   1. Calculates a normal vector between the midpoint of the two lines
@@ -524,7 +531,7 @@ class PolyLattice:
                 #   3. Sticks it onto the midpoint and checks for any close-by atoms
                 #   4. If close-by atoms exist, rotates by a random angle and checks again
                 #-------------------------------------------------------------------------------
-                
+                                
                 bad_links = 0 # number of links that failed to crosslink
                               # used to evaluate situations where crosslinking clearly isn't working
                               
@@ -534,7 +541,8 @@ class PolyLattice:
                     failure = 0 # a flag used to denote a link as having "failed"
                                 # defaulted to be 0: we're assuming that the link picked in the next line will work
                                 
-                    link = random_pick(potential_pairs, accepted_links, multilink) # picks a link
+                    # picks a link
+                    link = random_pick(potential_pairs, accepted_links, multilink)
                     a = link[0][-1] 
                     b = link[1][-1]                    
                     midpoint = 0.5*(a + b) # midpoint
