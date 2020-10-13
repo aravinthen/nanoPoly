@@ -52,8 +52,8 @@ class Simulation:
 # DATE: {today}                                                                                \n\
 #-----------------------------------------------------------------------------------           \n\
                                                                                                \n\
-{len(all_data)} atoms                                                                          \n\
-{len(all_data) - self.polylattice.num_walks + (len(self.polylattice.crosslinks_loc))} bonds    \n\
+{self.polylattice.num_beads} atoms                                                             \n\
+{self.polylattice.num_bonds} bonds                                                             \n\
                                                                                                \n\
 {len(self.polylattice.types)} atom types                                            \n\
 {len(self.polylattice.bonds)} bond types                                            \n\
@@ -237,7 +237,7 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data
         # this must be true for equilibration to take place.
         self.set_settings = True
 
-    def equilibration(self, steps, timestep, temp, dynamics, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=True, description=None):
+    def equilibrate(self, steps, timestep, temp, dynamics, bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=True, description=None):
         """
         ARGUMENTS:
         steps      - the number of steps taken in the equilibration
@@ -284,6 +284,24 @@ dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs 
 velocity        all create {float(temp)} 1231 \n\
 fix             1 all nve/limit {self.polylattice.lj_param}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
+"
+            if bonding == True:
+                if self.polylattice.cl_unbonded == False:
+                    raise EnvironmentError("Unbonded crosslinks are not present in the Polylattice!\n")                
+                else:
+                    b_data = self.polylattice.cl_bonding
+                    # jparam : the allowed beads
+                    for jparam in b_data[2]:
+                        if b_data[6] == None:
+                            self.lmp_sim_init += f"\
+fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} iparam {b_data[4]} jparam {b_data[5]} \n\
+"
+                        else:
+                            self.lmp_sim_init += f"\
+fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} jparam {b_data[5]} \n\
+"                            
+            
+            self.lmp_sim_init += f"\
 thermo_style    custom {data_string} \n\
 thermo          {output_steps}\n\
 "

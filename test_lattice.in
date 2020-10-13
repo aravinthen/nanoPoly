@@ -3,10 +3,10 @@
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        
 #-----------------------------------------------------------------------------------
 # FILENAME: test_lattice.in                                                        
-# DATE: 2020-10-07                                                                     
+# DATE: 2020-10-13                                                                     
 # OVERVIEW:                                                                         
 #    Number of polymer chains:     5                     
-#    Number of crosslinks:         10           
+#    Number of crosslinks:         0           
 #    Nanostructure:                None                 
 #-----------------------------------------------------------------------------------
                                                                                       
@@ -31,3 +31,22 @@ pair_coeff    * * 1.0 0.5
 bond_style    fene  
 special_bonds fene  
 bond_coeff    1 30.0 4.5 1.0 1.0 
+
+#-----------------------------------------------------------------------------------
+# EQUILIBRATION STAGE 1                                                 
+# Description: Langevin dynamics at 2T*, NVE ensemble.
+#-----------------------------------------------------------------------------------
+dump            1 all cfg 100 dump.test_lattice.in_*.cfg mass type xs ys zs fx fy fz
+
+velocity        all create 2.0 1231 
+fix             1 all nve/limit 0.5
+fix             2 all langevin 2.0 2.0 10.0 78621
+fix             3 all bond/create 1 4  1 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
+fix             4 all bond/create 1 4  2 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
+fix             5 all bond/create 1 4  3 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
+thermo_style    custom step temp press 
+thermo          100
+run             10000 
+unfix 1         
+unfix 2         
+write_restart   restart.test_lattice.in.polylattice1

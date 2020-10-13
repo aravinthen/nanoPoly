@@ -32,7 +32,6 @@ rw_cutoff = 4.5
 rw_epsilon = 1.0
 rw_sigma = 1.0
 
-
 # begin random walk
 total_time = 0
 for i in range(nums):
@@ -46,7 +45,7 @@ for i in range(nums):
 print(f"Total time taken for random walk configuration: {total_time}")
 
 # crosslinking information-------------------------------------------------------------------
-num_links = 10 # number of crosslinks
+num_links = 100 # number of crosslinks
 mass = 3.0 # mass of crosslinker bead
 cl_kval = rw_kval
 cl_epsilon = rw_epsilon
@@ -56,30 +55,29 @@ cl_cutoff = rw_cutoff
 
 t0 = t1 = 0
 t0 = time.time()
-crosslinks = box.crosslink(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, forbidden=[2], selflinking=30)
+# crosslinks = box.bonded_crosslinks(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, forbidden=[2], selflinking=30)
+box.unbonded_crosslinks(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, allowed=None, style='fene', prob=0.8, ibonds=2)
 t1 = time.time()
 print(f"Crosslinking concluded. Time taken: {t1 - t0}")
-
 
 # box.file_dump("data.txt")
 
 # safe = box.verify() # time-consuming, but checks whether simulation is safe
                     # returns booleans to allow control flow 
 
-# timestep = 0.01
-# desc1 = "Langevin dynamics at 2T*, NVE ensemble."
+timestep = 0.01
+desc1 = "Langevin dynamics at 2T*, NVE ensemble."
 # desc2 = "Nose-Hoover dynamics at 2T*, NPT ensemble."
 # desc3 = "Nose-Hoover dynamics from 2T* to 0.5T*, NPT ensemble."
 # desc4 = "Deformation procedure, 3e-2 engineering strain at temp"
 
 box.simulation.structure("test_structure.in")
 box.simulation.settings("test_lattice.in", comms=1.9)
-# box.simulation.equilibration(10000, timestep, 2, 'langevin', description=desc1, reset=False, dump=100)
-# box.simulation.equilibration(10000, timestep, 2, 'nose_hoover', description=desc2, reset=False)
-# box.simulation.equilibration(30000, timestep, 2, 'nose_hoover', final_temp=0.8, description=desc3, reset=False)
+box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=True, description=desc1, reset=False, dump=100)
+# box.simulation.equilibrate(10000, timestep, 2, 'nose_hoover', description=desc2, reset=False)
+# box.simulation.equilibrate(30000, timestep, 2, 'nose_hoover', final_temp=0.8, description=desc3, reset=False)
 
 # box.simulation.deform(100000, timestep, 3e-2, 0.8, reset=False, description=desc4)
 
 box.simulation.files()
-# box.simulation.run(folder="big_test", mpi=4)
-box.simulation.view("test_structure.in")
+# box.simulation.run(folo
