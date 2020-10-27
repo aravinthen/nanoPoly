@@ -8,12 +8,11 @@ import time
 
 print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
-pair_sigma = 0.5 # lennard jones potential length, pair potential information
+pair_sigma = 0.1 # lennard jones potential length, pair potential information
 pair_epsilon = 1.0
 
-celllen = 2.0 # cell length for lattice box
-cellnums = 10 # number of cells in each direction
-box = PolyLattice(celllen, cellnums, pair_cutoff, pair_sigma, pair_epsilon)
+box_size = 30
+box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 
 # types of atom in box-----------------------------------------------------------------------
 # key = types, entry = masses
@@ -24,13 +23,13 @@ types={1 : 1.0,
 # random walk information--------------------------------------------------------------------
 nums = 5 # number of random walks
 # size = 1360 # size of the chain
-size = 100 # size of the chain
+size = 10000 # size of the chain
 
 # following values determine the bonding 
 rw_kval = 30.0
 rw_cutoff = 4.5
 rw_epsilon = 1.0
-rw_sigma = 1.0
+rw_sigma = 0.1
 
 # begin random walk
 total_time = 0
@@ -56,7 +55,7 @@ cl_cutoff = rw_cutoff
 t0 = t1 = 0
 t0 = time.time()
 # crosslinks = box.bonded_crosslinks(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, forbidden=[2], selflinking=30)
-box.unbonded_crosslinks(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, allowed=None, style='fene', prob=0.8, ibonds=2)
+# box.unbonded_crosslinks(num_links, mass, cl_kval, cl_cutoff, cl_epsilon, cl_sigma, allowed=None, style='fene', prob=0.8, ibonds=2)
 t1 = time.time()
 print(f"Crosslinking concluded. Time taken: {t1 - t0}")
 
@@ -73,11 +72,13 @@ desc1 = "Langevin dynamics at 2T*, NVE ensemble."
 
 box.simulation.structure("test_structure.in")
 box.simulation.settings("test_lattice.in", comms=1.9)
-box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=True, description=desc1, reset=False, dump=100)
+box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=False, description=desc1, reset=False, dump=100)
+box.simulation.equilibrate(10000, timestep, 2, 'langevin', description=desc1, reset=False, dump=100)
 # box.simulation.equilibrate(10000, timestep, 2, 'nose_hoover', description=desc2, reset=False)
 # box.simulation.equilibrate(30000, timestep, 2, 'nose_hoover', final_temp=0.8, description=desc3, reset=False)
 
 # box.simulation.deform(100000, timestep, 3e-2, 0.8, reset=False, description=desc4)
 
 box.simulation.files()
-# box.simulation.run(folo
+box.simulation.view("test_structure.in")
+# box.simulation.run()

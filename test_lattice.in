@@ -3,7 +3,7 @@
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        
 #-----------------------------------------------------------------------------------
 # FILENAME: test_lattice.in                                                        
-# DATE: 2020-10-13                                                                     
+# DATE: 2020-10-27                                                                     
 # OVERVIEW:                                                                         
 #    Number of polymer chains:     5                     
 #    Number of crosslinks:         0           
@@ -27,10 +27,10 @@ neighbor      0.4 bin
 neigh_modify  every 10 one 10000                                                      
 comm_modify   mode single cutoff 1.9 vel yes                                      
 pair_style    lj/cut 1.5                                        
-pair_coeff    * * 1.0 0.5            
+pair_coeff    * * 1.0 0.1            
 bond_style    fene  
 special_bonds fene  
-bond_coeff    1 30.0 4.5 1.0 1.0 
+bond_coeff    1 30.0 4.5 1.0 0.1 
 
 #-----------------------------------------------------------------------------------
 # EQUILIBRATION STAGE 1                                                 
@@ -39,14 +39,27 @@ bond_coeff    1 30.0 4.5 1.0 1.0
 dump            1 all cfg 100 dump.test_lattice.in_*.cfg mass type xs ys zs fx fy fz
 
 velocity        all create 2.0 1231 
-fix             1 all nve/limit 0.5
-fix             2 all langevin 2.0 2.0 10.0 78621
-fix             3 all bond/create 1 4  1 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
-fix             4 all bond/create 1 4  2 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
-fix             5 all bond/create 1 4  3 1.0 1 prob 0.8 78621 iparam 2 jparam 1 
+fix             1 all nve/limit 0.1
+fix             2 all langevin 2.0 2.0 10.0 49632
 thermo_style    custom step temp press 
 thermo          100
 run             10000 
 unfix 1         
 unfix 2         
 write_restart   restart.test_lattice.in.polylattice1
+
+#-----------------------------------------------------------------------------------
+# EQUILIBRATION STAGE 2                                                 
+# Description: Langevin dynamics at 2T*, NVE ensemble.
+#-----------------------------------------------------------------------------------
+dump            1 all cfg 100 dump.test_lattice.in_*.cfg mass type xs ys zs fx fy fz
+
+velocity        all create 2.0 1231 
+fix             1 all nve/limit 0.1
+fix             2 all langevin 2.0 2.0 10.0 49632
+thermo_style    custom step temp press 
+thermo          100
+run             10000 
+unfix 1         
+unfix 2         
+write_restart   restart.test_lattice.in.polylattice2

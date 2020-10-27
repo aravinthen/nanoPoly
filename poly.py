@@ -54,7 +54,7 @@ class PolyLattice:
             # multiple beads allowed in a cell.
             self.beads = []
             
-    def __init__(self, cellside, cellnums, cutoff, sigma, epsilon):
+    def __init__(self, boxsize, cutoff, sigma, epsilon):
         """        
         cellside: Length of the side of a cells
         cellnums: Number of cells in one-dimension.
@@ -63,14 +63,17 @@ class PolyLattice:
         celltotal: total number of cells in lattice.
         """
         self.num_walks = 0
-        self.cellside = cellside
-        self.cellnums = cellnums
+        self.boxsize = boxsize # NOT GUARANTEED!!!!
+        
         self.lj_param = sigma # the lj distance between two atoms
         self.lj_cut = cutoff
         self.lj_energy = epsilon
-        self.celltotal = cellnums**3
         self.crossings = np.zeros((3, 1)) # number of crossings in each direction, [x, y, z]
                                           # encapsulates boundary conditions
+
+        self.cellside = 1.01*self.lj_param
+        self.cellnums = m.ceil(self.boxsize/self.cellside)
+        self.celltotal = self.cellnums**3
 
         # bond details
         self.bonds = None # 
@@ -97,9 +100,9 @@ class PolyLattice:
 
         # this bit of code builds the cells within the lattice.
         self.Cells = []
-        for i in range(cellnums):
-            for j in range(cellnums):
-                for k in range(cellnums):
+        for i in range(self.cellnums):
+            for j in range(self.cellnums):
+                for k in range(self.cellnums):
                     # fastest index
                     cell_positions = np.array([round(self.cellside*i, 16),
                                                round(self.cellside*j, 16),
@@ -346,7 +349,7 @@ class PolyLattice:
                 #    3. too close is defaultly assumed and maintained until end of loop
 
                 not_valid = True
-                while not_valid == True:
+                while not_valid:
                     trial_pos = new_position(current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
                     not_valid = self.index(self.which_cell(trial_pos)).forbidden
                     
@@ -463,7 +466,6 @@ class PolyLattice:
             trial_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
                                   random.uniform(cell_pos[1], cell_bound[1]),
                                   random.uniform(cell_pos[2], cell_bound[2])])
-
 
             invalid_pos = True
             while invalid_pos:
