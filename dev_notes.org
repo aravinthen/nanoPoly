@@ -1,51 +1,8 @@
 * Development Notes
-** nanoPoly workflow
-1. *Initialize a PolyLattice object*.
-   To do this, you need to specify the size of the cells in LJ units, the number of cells
-   that make up the box and the lennard-jones units for the box.
-2. *Populate the box with random walks*.
-   Set the initial conditions for a random walk and let it run randomly within the
-   box. These random walks
-   The main initial conditions are:
-     i. ID of the random walk (this has to be integer).
-    ii. The size of the random walk.
-   iii. The "size" of the bond, with the cutoff being determined via this value.
-    iv. Bead types: a dictionary containing the bead type and mass.
-3. *Crosslinking*
-   Now that your box is full of random-walk beads, you can initiate a cross-linking
-   procedure. This step requires three main parameters:
-     i. num_links - number of crosslinks within the system
-    ii. The mass of the crosslinker atom.
-   iii. The bond length between the crosslinkers.
-4. *Simulation setup*
-   These are various parameters that control the simulation process.   
-** bonds
-- LENNARD-JONES:
-  This is a PAIR style
-  Three values: X    - global cutoff distance
-                I, J - atom types, different interactions are placed here
-		       (use * * for all types)
-		Y    - Energy units
-		Z    - Distance units
+** Timings:
+Size seems to be heavily dependent of the system box lengths.
+Larger boxes with _smaller_ overall densities seem, for some reason, to take ages.
+*Why is this?*
 
-  Example:
-      pair_style lj/cut X
-      pair_coeff I J Y Z
-
-- FENE 
-  Values: T - type of bond
-          # next two terms encompass the attraction
-          K - energy/distance
-          R - attraction distance
-	  # next terms are for the repulsion
-          E - lennard jones unit energy
-	  S - lennard jones distance
-
-  bond_style fene
-  bond_coeff T K R E S
-** Problem:
-   *BONDS CANNOT BE FIXED IN LAMMPS*.
-   Simply setting the bond length to be an given value will undoubtedly crash the
-   simulation unless the said value is picked very carefully.
-   
-   
+- 100000  beads: 54.04952955245972 
+- 1000000 beads: 318.6630344390869

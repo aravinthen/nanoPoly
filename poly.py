@@ -174,9 +174,8 @@ class PolyLattice:
                 surrounding_beads.append(bead)
         
         return surrounding_beads
-    
 
-    def random_walk(self, ID, numbeads, Kval, cutoff, energy, sigma, mini=1.12234, style='fene', phi=None, theta=None, bead_types=None, cell_num=None, copolymer=None):
+    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, mini=1.12234, style='fene', phi=None, theta=None, bead_types=None, cell_num=None, termination=None, allowed_failures=10000):
         """
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -194,9 +193,16 @@ class PolyLattice:
                     MUST be a list.
         PARAMETER - bead_types: defines and identifies the beads and their types.
                     MUST BE A DICTIONARY.
-        PARAMETER - copolymer: transforms random walk into a copolymer arrangement                    
+        PARAMETER - termination: THREE OPTIONS - a) None, b) Retract and c) Break
+                    
         Notes: Nested functions prevent the helper functions from being used outside of scope.       
         """
+
+        ID = self.num_walks + 1
+        if termination == "None":
+            print("Warning: if this random walk is unsucessful, the program will terminate.")
+        if termination == "retract" and (numbeads + self.num_beads > 50000):            
+            print("Warning: this option is time-intensive for large systems.")
 
         if sigma < self.lj_param:
             print("You cannot set the bond length to be less than the pair potential")
@@ -303,7 +309,6 @@ class PolyLattice:
 
         bead_number = 0
 
-
         # trial for the initial position
         current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
                                 random.uniform(cell_pos[1], cell_bound[1]),
@@ -336,8 +341,9 @@ class PolyLattice:
         self.index(current_cell).beads.append(bead_data)
         
         # Begin loop here.
-        bond = mini*sigma # the minimum of the LJ potential        
-        for i in range(1, numbeads):
+        bond = mini*sigma # the minimum of the LJ potential
+        i = 1
+        while i < numbeads:            
             too_close = True # used to check if the cell is too close
             generation_count = 0 # this counts the number of random vectors generated.
                                  # used to raise error messages.
@@ -385,18 +391,43 @@ class PolyLattice:
                     too_close = False
                     
                 generation_count += 1
-                if generation_count % 10000 == 0:
-                    print("")
-                    print("Warning for Random Walk ID: " + str(ID))
-                    print("The system has now generated %d unsuccessful positions for this walk." % (generation_count))
-                    print("It's very likely that the random walk has either become trapped or")
-                    print("that the lattice has become too dense to generate a valid position.")
-                    print("It is highly recommended to restart the program with:")
-                    print("a) a fewer number of atoms,")
-                    print("b) a larger amount of lattice space,")
-                    print("c) a smaller step distance.")
-                    raise Exception("Program terminated.")
+                if generation_count % allowed_failures == 0:
+                    if termination == "break":
+                        new_numbeads = numbeads - i
+                        self.num_beads += i
+                        self.num_bonds += i - 1
+                        self.num_walks += 1
+                        print(f"Breaking random walk! There are now {self.num_walks} chains in the system.")
+                        print(f"New chain length: {new_numbeads}")
+                        self.random_walk(new_numbeads, Kval, cutoff, energy, sigma, mini=mini, style=style, bead_types=bead_types, termination=True)                    
+                        return 1
+                    
+                    elif termination == "retract":
+                        print(f"Retracting at bead {i} of random walk {ID}")                        
+                        # adjust walk positions                        
+                        i = i - 1
+                        
+                        progress = self.walk_data(ID)
+                        bad_bead = progress[-1]
+                        current_cell = self.which_cell(bad_bead[-1])
 
+                        self.index(current_cell).beads.remove(bad_bead)
+
+                        progress = self.walk_data(ID)
+                        trial_pos = progress[-1][-1]
+                                                
+                    else:                        
+                        raise Exception("Program terminated.")
+                        print("")
+                        print("Warning for Random Walk ID: " + str(ID))
+                        print("The system has now generated %d unsuccessful positions for this walk." % (generation_count))
+                        print("It's very likely that the random walk has either become trapped or")
+                        print("that the lattice has become too dense to generate a valid position.")
+                        print("It is highly recommended to restart the program with:")
+                        print("a) a fewer number of atoms,")
+                        print("b) a larger amount of lattice space,")
+                        print("c) a smaller step distance.")
+                        
             current_pos = trial_pos
 
             current_cell = self.which_cell(current_pos)
@@ -408,6 +439,7 @@ class PolyLattice:
                          current_pos]
 
             self.index(current_cell).beads.append(bead_data)
+            i+=1
 
         self.num_walks += 1
         self.num_beads += numbeads

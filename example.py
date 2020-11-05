@@ -8,10 +8,10 @@ import time
 
 print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
-pair_sigma = 0.1 # lennard jones potential length, pair potential information
+pair_sigma = 0.3 # lennard jones potential length, pair potential information
 pair_epsilon = 1.0
 
-box_size = 30
+box_size = 3
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 
 # types of atom in box-----------------------------------------------------------------------
@@ -21,15 +21,15 @@ types={1 : 1.0,
        3 : 1.0}
 
 # random walk information--------------------------------------------------------------------
-nums = 5 # number of random walks
+nums = 1# number of random walks
 # size = 1360 # size of the chain
-size = 10000 # size of the chain
+size = 640 # size of the chain
 
 # following values determine the bonding 
 rw_kval = 30.0
-rw_cutoff = 4.5
-rw_epsilon = 1.0
-rw_sigma = 0.1
+rw_cutoff = 3.5
+rw_epsilon = 0.5
+rw_sigma = 0.6
 
 # begin random walk
 total_time = 0
@@ -37,10 +37,11 @@ for i in range(nums):
     t0 = t1 = 0
     t0 = time.time()    
     # you can use cell_num to control where walk starts
-    box.random_walk(i, size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_types = types)
+    # box.random_walk(i, size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_types = types)
+    box.random_walk(size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_types = types, termination="retract")
     t1 = time.time()
     total_time+= t1-t0
-    print(f"Random walk {i+1} successful. Time taken: {t1 - t0}")
+    print(f"Attempt {i+1} successful. Time taken: {t1 - t0}")
 print(f"Total time taken for random walk configuration: {total_time}")
 
 # crosslinking information-------------------------------------------------------------------
@@ -70,15 +71,21 @@ desc1 = "Langevin dynamics at 2T*, NVE ensemble."
 # desc3 = "Nose-Hoover dynamics from 2T* to 0.5T*, NPT ensemble."
 # desc4 = "Deformation procedure, 3e-2 engineering strain at temp"
 
+t0 = time.time()
 box.simulation.structure("test_structure.in")
-box.simulation.settings("test_lattice.in", comms=1.9)
-box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=False, description=desc1, reset=False, dump=100)
-box.simulation.equilibrate(10000, timestep, 2, 'langevin', description=desc1, reset=False, dump=100)
+t1 = time.time()
+print(f"Structure file created.Time taken: {t1 - t0}")
+t0 = time.time()
+# box.simulation.settings("test_lattice.in", comms=1.9)
+# box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=False, description=desc1, reset=False, dump=100)
+# box.simulation.equilibrate(10000, timestep, 2, 'langevin', description=desc1, reset=False, dump=100)
 # box.simulation.equilibrate(10000, timestep, 2, 'nose_hoover', description=desc2, reset=False)
 # box.simulation.equilibrate(30000, timestep, 2, 'nose_hoover', final_temp=0.8, description=desc3, reset=False)
-
 # box.simulation.deform(100000, timestep, 3e-2, 0.8, reset=False, description=desc4)
+t1 = time.time()
+print(f"Simulation file created.Time taken: {t1 - t0}")
 
 box.simulation.files()
 box.simulation.view("test_structure.in")
 # box.simulation.run()
+
