@@ -10,6 +10,7 @@ import os.path
 from os import path
 import subprocess
 import glob
+import multiprocessing
 import shutil
 from datetime import date
 today = date.today()
@@ -25,7 +26,6 @@ class Simulation:
         
         # file info        
         self.lmp_sim_init = ""  # the simulation init file configuration
-        self.lmp_sim_data = ""  # the atomic configuration data, to be read into lmp_sim_init
         self.file_name = None   # name of file. This is set in settings().
         self.data_file = None   # name of datafile. This is set in structure().
         
@@ -40,11 +40,16 @@ class Simulation:
         NOTE: this comes FIRST in the simulation's order of precedence!
         """
         self.data_file = str(datafile) # this sets the data in the class so it can be reused.
-        
+        f = open(f"{self.data_file}", "w")
+
+
+        t0 = time.time()
         all_data = self.polylattice.walk_data() # where all the data is stored
+        t1 = time.time()
+        print(f"Data read in. Time taken: {t1 - t0}")
         
         # write the initial 
-        self.lmp_sim_data += f"\
+        f.write(f"\
 #-----------------------------------------------------------------------------------           \n\
 # NANOPOLY - POLYMER NANOCOMPOSITE STRUCTURAL DATA FILE                                        \n\
 #-----------------------------------------------------------------------------------           \n\
@@ -64,19 +69,18 @@ class Simulation:
                                                                                     \n\
 Masses                                                                              \n\
                                                                                     \n\
-"
+")
         # read in the mass data.
         for i in self.polylattice.types:
-            self.lmp_sim_data+=f"{i}\t{self.polylattice.types[i]}\n"
-        self.lmp_sim_data+="\n\n"
-
+            f.write(f"{i}\t{self.polylattice.types[i]}\n")
+        f.write("\n\n")
 
         # this is highly dependent on the bead type.
 
         # now it's time to read in data.
-        self.lmp_sim_data+="\
+        f.write("\
 Atoms                                                                               \n\
-\n"
+\n")
         cross_posn = []
         for i in self.polylattice.crosslinks_loc:
             bond1 = i[0][-1]
@@ -86,6 +90,8 @@ Atoms                                                                           
         
         cross_vals = []
         linknums = []
+
+        t0 = time.time()
         for i in range(len(all_data)):
             atom_num = i+1
             chain = all_data[i][0]
@@ -104,24 +110,30 @@ Atoms                                                                           
                 
 
             x, y, z = all_data[i][-1][0], all_data[i][-1][1], all_data[i][-1][2]
-            self.lmp_sim_data += f"\t{atom_num}\t{chain}\t{beadtype}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n"
-
-        # reading in the bond data        
-        self.lmp_sim_data+="\
-Bonds                                                                               \n\
-                                                                                    \n"
-        bond = 1
-        atom_num = 2
-        for j in range(1,len(all_data)):
-            chain_atom = all_data[j][1]
-            bondtype = all_data[j][4]
-            if chain_atom == 0:                                
-                atom_num+=1
-            else:
-                self.lmp_sim_data += f"\t{bond}\t{bondtype}\t{atom_num-1}\t{atom_num}\n"
-                bond+=1
-                atom_num+=1
+            f.write(f"\t{atom_num}\t{chain}\t{beadtype}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
             
+        t1 = time.time()
+        print(f"Positions read in. Time taken: {t1 - t0}")
+        
+        # reading in the bond data        
+        f.write("\
+Bonds                                                                               \n\
+                                                                                    \n")
+        
+        t0 = time.time()
+        bond = 0
+        atom_num = 1
+        for walk in self.polylattice.walkinfo:
+            for bead in range(1,walk[1]):
+                # writing the bond
+                atom_num += 1
+                bond += 1
+                bondtype = all_data[atom_num-1][4]
+                f.write(f"\t{bond}\t{bondtype}\t{(atom_num-1)}\t{atom_num}\n")
+            atom_num+=1
+        t1 = time.time()
+        print(f"Bonds read in. Total time taken: {t1 - t0}")        
+                
         # crosslinker bonds next. This is slightly more complicated.
 #        print(cross_vals)        
         for i in self.polylattice.crosslinks_loc:
@@ -137,10 +149,12 @@ Bonds                                                                           
             clinker_num = [dat[1] for dat in linknums if dat[0]==clinker][0]
             bond2_num = [dat[1] for dat in cross_vals if dat[0]==bond2][0]
             
-            self.lmp_sim_data += f"\t{bond}\t{bondtype}\t{bond1_num}\t{clinker_num}\n"
+            f.write(f"\t{bond}\t{bondtype}\t{bond1_num}\t{clinker_num}\n")
             bond+=1
-            self.lmp_sim_data += f"\t{bond}\t{bondtype}\t{clinker_num}\t{bond2_num}\n"
+            f.write(f"\t{bond}\t{bondtype}\t{clinker_num}\t{bond2_num}\n")
             bond+=1
+            
+        f.close()
 
         
     def settings(self, filename=None, dielectric=False, comms=None):
@@ -173,7 +187,7 @@ Bonds                                                                           
         
         if self.data_file == None:
             print("ERROR: A structure file has not yet been defined.")
-            print("Please define one using the simulation.sim_setup command.")
+            print("Please define one using the simulation.structure command.")
             print("Setup aborted.")
             return 0
 
@@ -394,8 +408,6 @@ unfix datafile \n\
 "
         
     def files(self, ):
-        with open(f"{self.data_file}", "w") as f:
-            f.write(self.lmp_sim_data)
         with open(f"{self.file_name}", "w") as f:
             f.write(self.lmp_sim_init)
             

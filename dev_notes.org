@@ -1,8 +1,23 @@
 * Development Notes
 ** Timings:
-Size seems to be heavily dependent of the system box lengths.
-Larger boxes with _smaller_ overall densities seem, for some reason, to take ages.
-*Why is this?*
+*100,000 beads*
+ Volume: 20^3
+ Box generated, with 300763 cells in total.       Time taken: 1.5558512210845947
+ Random walk configuration generated.             Time taken: 72.85870862007141
+ Data read in.                                    Time taken: 0.14271020889282227
+ Positions read in.                               Time taken: 54.4847047328949
+ Bonds read in.                                   Time taken: 162.0366804599762
 
-- 100000  beads: 54.04952955245972 
-- 1000000 beads: 318.6630344390869
+ Structure file created.                          Time taken: 216.66788697242737
+ 
+*300,000 beads*
+ Volume: 50^3
+ Box generated, with 4574296 cells in total.      Time taken: 27.72123026847839
+ Random walk configuration generated.             Time taken: 69.06583285331726
+ Data read in.                                    Time taken: 0.757080078125000
+ Positions read in.                               Time taken: 632.4482958316803
+ Bonds read in.                                   Time taken: 1670.089231967926
+
+ Structure file created.                          Time taken: 2303.302131175995
+
+

@@ -11,6 +11,7 @@
 
 import numpy as np
 import math as m
+import time
 import sys
 import random
 
@@ -62,7 +63,6 @@ class PolyLattice:
         epsilon: lennard jones energy
         celltotal: total number of cells in lattice.
         """
-        self.num_walks = 0
         self.boxsize = boxsize # NOT GUARANTEED!!!!
         
         self.lj_param = sigma # the lj distance between two atoms
@@ -91,26 +91,43 @@ class PolyLattice:
                           # "type" is numerical
         
         self.random_walked = False
+        self.walkinfo = [] # this is supposed to store the walk as well as the number of
+                            # beads in that walk.
+                            # used to control the bond writing process in the simulation class
+        
         self.nanostructure = None
         self.simulation = Simulation(self) # attaches to the simulation class
 
         # counts
+        self.num_walks = 0
         self.num_bonds = 0
         self.num_beads = 0
 
         # this bit of code builds the cells within the lattice.
         self.Cells = []
-        for i in range(self.cellnums):
-            for j in range(self.cellnums):
-                for k in range(self.cellnums):
-                    # fastest index
-                    cell_positions = np.array([round(self.cellside*i, 16),
-                                               round(self.cellside*j, 16),
-                                               round(self.cellside*k, 16)])
-                    self.Cells.append(self.Cell(i, j, k, cell_positions, self.cellside))
+        
+        # for i in range(self.cellnums):
+        #     for j in range(self.cellnums):
+        #         for k in range(self.cellnums):
+        #             # fastest index
+        #             cell_positions = np.array([round(self.cellside*i, 16),
+        #                                        round(self.cellside*j, 16),
+        #                                        round(self.cellside*k, 16)])
+        #             self.Cells.append(self.Cell(i, j, k, cell_positions, self.cellside))
+
+        index_list = ((i,j,k)
+                      for i in range(self.cellnums)
+                      for j in range(self.cellnums)
+                      for k in range(self.cellnums))
+        
+        for index in index_list:
+            cell_positions = np.array([round(self.cellside*index[0], 16),
+                                       round(self.cellside*index[1], 16),
+                                       round(self.cellside*index[2], 16)])
+            self.Cells.append(self.Cell(index[0], index[1], index[2], cell_positions, self.cellside))
+            
                 
     # -------------------------------- METHODS --------------------------------
-    # This is the hard part.
     # The following methods are included:
     # 0a. Retrieve a cell based on index.
     # 0b. Retrieve a cell based on position.
@@ -201,9 +218,6 @@ class PolyLattice:
         ID = self.num_walks + 1
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
-        if termination == "retract" and (numbeads + self.num_beads > 50000):            
-            print("Warning: this option is time-intensive for large systems.")
-
         if sigma < self.lj_param:
             print("You cannot set the bond length to be less than the pair potential")
             print("length. Either modify the bond length or increase the pair")
@@ -445,6 +459,8 @@ class PolyLattice:
         self.num_beads += numbeads
         self.num_bonds += numbeads - 1
         self.random_walked = True
+
+        self.walkinfo.append([ID, numbeads])
 
 
     def unbonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, bdist=None, prob=None, style='fene', allowed=None, ibonds=2, jbonds=1):
@@ -840,12 +856,13 @@ class PolyLattice:
 
     def walk_data(self, which_ID = None):
         all_data = []
+        
         for cell in self.Cells:
             for bead in cell.beads:
                 all_data.append(bead)
-
-            all_data.sort(key = lambda x: (x[0], x[1]))
-
+                
+        all_data.sort(key = lambda x: (x[0], x[1]))
+        
         if (which_ID == None):
             return all_data
         else:
