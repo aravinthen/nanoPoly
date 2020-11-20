@@ -13,6 +13,7 @@ import numpy as np
 import math as m
 import time
 import sys
+import multiprocessing
 import random
 
 sys.path.append(".")
@@ -74,7 +75,7 @@ class PolyLattice:
         self.cellside = 1.01*self.lj_param
         self.cellnums = m.ceil(self.boxsize/self.cellside)
         self.celltotal = self.cellnums**3
-
+        
         # bond details
         self.bonds = None # 
         
@@ -180,7 +181,7 @@ class PolyLattice:
                     surround_ind.append([(cell_index[0]+i)%self.cellnums,
                                          (cell_index[1]+j)%self.cellnums,
                                          (cell_index[2]+k)%self.cellnums])
-
+                    
         bead_lists = []
         for cell in surround_ind:
             bead_lists.append(self.index(cell).beads)
@@ -414,7 +415,7 @@ class PolyLattice:
                         print(f"Breaking random walk! There are now {self.num_walks} chains in the system.")
                         print(f"New chain length: {new_numbeads}")
                         self.random_walk(new_numbeads, Kval, cutoff, energy, sigma, mini=mini, style=style, bead_types=bead_types, termination=True)                    
-                        return 1
+                        return 0
                     
                     elif termination == "retract":
                         print(f"Retracting at bead {i} of random walk {ID}")                        
@@ -429,6 +430,7 @@ class PolyLattice:
 
                         progress = self.walk_data(ID)
                         trial_pos = progress[-1][-1]
+                        return 0
                                                 
                     else:                        
                         raise Exception("Program terminated.")
@@ -461,6 +463,7 @@ class PolyLattice:
         self.random_walked = True
 
         self.walkinfo.append([ID, numbeads])
+        return 1
 
 
     def unbonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, bdist=None, prob=None, style='fene', allowed=None, ibonds=2, jbonds=1):

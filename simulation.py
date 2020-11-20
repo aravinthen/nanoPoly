@@ -42,7 +42,6 @@ class Simulation:
         self.data_file = str(datafile) # this sets the data in the class so it can be reused.
         f = open(f"{self.data_file}", "w")
 
-
         t0 = time.time()
         all_data = self.polylattice.walk_data() # where all the data is stored
         t1 = time.time()
@@ -166,7 +165,8 @@ Bonds                                                                           
                     dielectric: whether the material is dielectric or not.
                                 WARNING! needs a bit of confirmation.
         """
-
+        
+        
         if comms == None:
             comms = 2*self.polylattice.lj_param
 
@@ -201,8 +201,9 @@ Bonds                                                                           
         # NOTE: you /can/ use curly braces by doubling. I should do this, but i'm in too deep
         
         fname = str(filename)
-        self.file_name = str(fname) # this sets the file name in the class so it can be reused.
-        self.lmp_sim_init += f"\
+        self.file_name = fname
+        f = open(f"{fname}", "w")
+        f.write(f"\
 #-----------------------------------------------------------------------------------\n\
 # NANOPOLY - POLYMER NANOCOMPOSITE SIMULATION FILE                                  \n\
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        \n\
@@ -233,23 +234,24 @@ neigh_modify  every 10 one 10000                                                
 comm_modify   mode single cutoff {comms} vel yes                                      \n\
 pair_style    lj/cut {self.polylattice.lj_cut}                                        \n\
 pair_coeff    * * {self.polylattice.lj_energy} {self.polylattice.lj_param}            \n\
-"
+")
         # now it's time to read in the bond information.
         styles_dict = dictionary_shuffle(self.polylattice.bonds, -1)        
         for style in styles_dict:
-            self.lmp_sim_init += f"\
-bond_style    {style}  \n"
+            f.write(f"\
+bond_style    {style}  \n")
             if style == 'fene':                
-                self.lmp_sim_init += f"\
-special_bonds fene  \n"
+                f.write(f"\
+special_bonds fene  \n")
             for data in styles_dict[style]:
-                self.lmp_sim_init += f"\
-bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data[1][2]} {data[1][3]} \n"
+                f.write(f"\
+bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data[1][2]} {data[1][3]} \n")
                 
-
         # ensures that the settings have been set.
         # this must be true for equilibration to take place.
         self.set_settings = True
+
+        f.close()
 
     def equilibrate(self, steps, timestep, temp, dynamics, bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=True, description=None):
         """
@@ -277,139 +279,144 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data
         if not self.set_settings:
             self.equibs-=1
             raise Exception("Settings have not yet been defined.")
-        
-        self.lmp_sim_init += f"\n\
-#-----------------------------------------------------------------------------------\n\
-# EQUILIBRATION STAGE {self.equibs}                                                 \n"
-        if description != None:
-            self.lmp_sim_init += f"# Description: {description}\n"
 
-        self.lmp_sim_init += "\
+        f = open(self.file_name, 'w')
+        
+        f.write(f"\n\
 #-----------------------------------------------------------------------------------\n\
-"
+# EQUILIBRATION STAGE {self.equibs}                                                 \n")
+                
+        if description != None:
+            f.write("# Description: {description}\n")
+
+        f.write("\
+#-----------------------------------------------------------------------------------\n\
+")
         if dynamics=='langevin':            
             if dump>0:
                 self.dumping = 1
-                self.lmp_sim_init += f"\
+                f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
 \n\
-"            
-            self.lmp_sim_init += f"\
+")
+            f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
 fix             1 all nve/limit {self.polylattice.lj_param}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
-"
+")
             if bonding == True:
                 if self.polylattice.cl_unbonded == False:
-                    raise EnvironmentError("Unbonded crosslinks are not present in the Polylattice!\n")                
+                    raise EnvironmentError("Unbonded crosslinks are not present in the Polylattice!\n")
                 else:
                     b_data = self.polylattice.cl_bonding
                     # jparam : the allowed beads
                     for jparam in b_data[2]:
                         if b_data[6] == None:
-                            self.lmp_sim_init += f"\
+                            f.write(f"\
 fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} iparam {b_data[4]} jparam {b_data[5]} \n\
-"
+")
                         else:
-                            self.lmp_sim_init += f"\
+                            f.write(f"\
 fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} jparam {b_data[5]} \n\
-"                            
+") 
             
-            self.lmp_sim_init += f"\
+            f.write(f"\
 thermo_style    custom {data_string} \n\
 thermo          {output_steps}\n\
-"
+")
             if reset == True:
-                self.lmp_sim_init += f"\
+                f.write(f"\
 reset_timestep  0\n\
-"
-            self.lmp_sim_init += f"\
+")
+            f.write(f"\
 run             {steps} \n\
 unfix 1         \n\
 unfix 2         \n\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
-"
+")
         if dynamics=='nose_hoover':
             if dump>0:
                 self.dumping = 1
-                self.lmp_sim_init += f"\
+                f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
 \n\
-"  
-            self.lmp_sim_init += f"\
+")
+            f.write(f"\
 fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
 fix             2 all momentum 1 linear 1 1 1\n\
 thermo_style    custom {data_string} \n\
 thermo          {output_steps}\n\
-"
+")
             if reset == True:
-                self.lmp_sim_init += f"\
+                f.write(f"\
 reset_timestep  0\n\
-"
-            self.lmp_sim_init += f"\
+")
+            f.write(f"\
 run             {steps} \n\
 unfix 1         \n\
 unfix 2         \n\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
-"            
+")
+            f.close()
 
     def deform(self, steps, timestep, strain, temp, tdamp=None, pdamp=1000, drag=2.0, datafile=True, output_steps=100, reset=True, data=('step','temp','pxx', 'pyy', 'pzz', 'lx', 'ly', 'lz'), description = None):
         """
         Carries out the deformation of the tyres. 
         """
-        self.lmp_sim_init += f"\n\
+        if not self.set_settings:
+            self.equibs-=1
+            raise Exception("Settings have not yet been defined.")
+
+        f = open(self.file_name, 'w')
+        f.write(f"\n\
 #-----------------------------------------------------------------------------------\n\
-# DEFORMATION STAGE                                                                 \n"
+# DEFORMATION STAGE                                                                 \n")
         if description != None:
             self.lmp_sim_init += f"# Description: {description}\n"
 
-        self.lmp_sim_init += "\
+        f.write("\
 #-----------------------------------------------------------------------------------\n\
-"
+")
         data_string = " ".join(data)
         
         if tdamp==None:
             tdamp=100*timestep
 
-        self.lmp_sim_init += f"\
+        f.write(f"\
 run             0            \n\
 fix		1 all npt temp {temp} {temp} {tdamp} y 0 0 {pdamp} z 0 0 {pdamp} drag {drag}  \n\
 fix		2 all deform 1 x erate {strain} units box remap x                             \n\
-"
+")
         if datafile==True:
             self.data_production = 1
             title = "\"" + "\t".join(data) + "\""
             for i in data:
-                self.lmp_sim_init += f"\
+                f.write(f"\
 variable        var_{i} equal \"{i}\"              \n\
-"
+")
             file_string = "\"${var_"+ "}\t${var_".join(data) + "}\""
 
-            self.lmp_sim_init += f"\
+            f.write(f"\
 fix             datafile all print {output_steps} {file_string} file {self.file_name}.deform.data title {title} screen no \n\
-"
+")
             
-        self.lmp_sim_init += f"\
+        f.write(f"\
 thermo_style    custom {data_string}                   \n\
 thermo          {output_steps}                         \n\
-"
+")
         if reset == True:
-            self.lmp_sim_init += f"\
+            f.write(f"\
 reset_timestep  0\n\
-"
-        self.lmp_sim_init += f"\
+")
+        f.write(f"\
 run             {steps}                                \n\
 unfix 1                                                \n\
 unfix 2                                                \n\
-"   
+")
         if datafile == True:
-            self.lmp_sim_init += f"\
+            f.write(f"\
 unfix datafile \n\
-"
-        
-    def files(self, ):
-        with open(f"{self.file_name}", "w") as f:
-            f.write(self.lmp_sim_init)
+")
             
     def run(self, folder=None, mpi=0):
         """
