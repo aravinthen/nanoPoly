@@ -10,7 +10,7 @@ import time
 print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
 pair_sigma = 0.3 # lennard jones potential length, pair potential information
-pair_epsilon = 1.0
+pair_epsilon = 0.05
 box_size = 10
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
@@ -25,13 +25,13 @@ types={1 : 1.0,
        3 : 1.0}
 
 # random walk information--------------------------------------------------------------------
-nums = 5# number of random walks
-size = 1000 # size of the chain
+nums = 1# number of random walks
+size = 500 # size of the chain
 
 # following values determine the bonding 
-rw_kval = 40.0
+rw_kval = 30.0
 rw_cutoff = 3.5
-rw_epsilon = 0.5
+rw_epsilon = 0.05
 rw_sigma = 0.5
 
 # SERIALIZED VERSION: 
@@ -63,9 +63,6 @@ print(f"Crosslinking concluded. Time taken: {t1 - t0}")
 
 # box.file_dump("data.txt")
 
-# safe = box.verify() # time-consuming, but checks whether simulation is safe
-                    # returns booleans to allow control flow 
-
 timestep = 0.01
 desc1 = "Langevin dynamics at 2T*, NVE ensemble."
 desc2 = "Nose-Hoover dynamics at 2T*, NPT ensemble."
@@ -78,14 +75,14 @@ t1 = time.time()
 print(f"Structure file created.Time taken: {t1 - t0}")
 t0 = time.time()
 box.simulation.settings("test_lattice.in", comms=1.9)
-box.simulation.equilibrate(10000, timestep, 2, 'langevin',bonding=False, description=desc1, reset=False, dump=100)
-box.simulation.equilibrate(10000, timestep, 2, 'langevin', description=desc1, reset=False, dump=100)
-box.simulation.equilibrate(10000, timestep, 2, 'nose_hoover', description=desc2, reset=False)
-box.simulation.equilibrate(30000, timestep, 2, 'nose_hoover', final_temp=0.8, description=desc3, reset=False)
-box.simulation.deform(100000, timestep, 3e-2, 0.8, reset=False, description=desc4)
+box.simulation.equilibrate(20000, timestep, 0.05, 'langevin', final_temp=0.2, pdamp=1000000, bonding=False, description=desc1, reset=False, dump=100)
+# box.simulation.equilibrate(10000, timestep, 0.8, 'langevin', description=desc1, reset=False, dump=100)
+# box.simulation.equilibrate(10000, timestep, 0.8, 'nose_hoover', description=desc2, reset=False)
+# box.simulation.equilibrate(30000, timestep, 0.8, 'nose_hoover', final_temp=0.5, description=desc3, reset=False)
+# box.simulation.deform(100000, timestep, 3e-2, 0.5, reset=False, description=desc4)
 t1 = time.time()
 print(f"Simulation file created.Time taken: {t1 - t0}")
 
 box.simulation.view("test_structure.in")
-# box.simulation.run()
+box.simulation.run(folder="test", mpi=7)
 

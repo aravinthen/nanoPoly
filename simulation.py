@@ -280,7 +280,7 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data
             self.equibs-=1
             raise Exception("Settings have not yet been defined.")
 
-        f = open(self.file_name, 'w')
+        f = open(self.file_name, 'a')
         
         f.write(f"\n\
 #-----------------------------------------------------------------------------------\n\
@@ -367,7 +367,7 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
             self.equibs-=1
             raise Exception("Settings have not yet been defined.")
 
-        f = open(self.file_name, 'w')
+        f = open(self.file_name, 'a')
         f.write(f"\n\
 #-----------------------------------------------------------------------------------\n\
 # DEFORMATION STAGE                                                                 \n")
