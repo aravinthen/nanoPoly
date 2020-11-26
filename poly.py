@@ -404,7 +404,7 @@ class PolyLattice:
                     current_pos = previous
                 else:
                     too_close = False
-                    
+
                 generation_count += 1
                 if generation_count % allowed_failures == 0:
                     if termination == "break":
@@ -430,8 +430,7 @@ class PolyLattice:
 
                         progress = self.walk_data(ID)
                         trial_pos = progress[-1][-1]
-                        return 0
-                                                
+
                     else:                        
                         raise Exception("Program terminated.")
                         print("")
@@ -453,7 +452,7 @@ class PolyLattice:
                          bead_types[(i % len(bead_types))+1],
                          bond_type,
                          current_pos]
-
+            
             self.index(current_cell).beads.append(bead_data)
             i+=1
 
@@ -461,6 +460,7 @@ class PolyLattice:
         self.num_beads += numbeads
         self.num_bonds += numbeads - 1
         self.random_walked = True
+        print(self.num_beads)
 
         self.walkinfo.append([ID, numbeads])
         return 1

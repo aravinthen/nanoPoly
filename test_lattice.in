@@ -3,7 +3,7 @@
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        
 #-----------------------------------------------------------------------------------
 # FILENAME: test_lattice.in                                                        
-# DATE: 2020-11-20                                                                     
+# DATE: 2020-11-26                                                                     
 # OVERVIEW:                                                                         
 #    Number of polymer chains:     1                     
 #    Number of crosslinks:         0           
@@ -40,7 +40,7 @@ dump            1 all cfg 100 dump.test_lattice.in_*.cfg mass type xs ys zs fx f
 
 velocity        all create 0.05 1231 
 fix             1 all nve/limit 0.3
-fix             2 all langevin 0.05 0.2 10.0 22507
+fix             2 all langevin 0.05 0.2 10.0 96648
 thermo_style    custom step temp press 
 thermo          100
 run             20000 

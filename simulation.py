@@ -42,10 +42,7 @@ class Simulation:
         self.data_file = str(datafile) # this sets the data in the class so it can be reused.
         f = open(f"{self.data_file}", "w")
 
-        t0 = time.time()
         all_data = self.polylattice.walk_data() # where all the data is stored
-        t1 = time.time()
-        print(f"Data read in. Time taken: {t1 - t0}")
         
         # write the initial 
         f.write(f"\
@@ -90,7 +87,6 @@ Atoms                                                                           
         cross_vals = []
         linknums = []
 
-        t0 = time.time()
         for i in range(len(all_data)):
             atom_num = i+1
             chain = all_data[i][0]
@@ -111,15 +107,12 @@ Atoms                                                                           
             x, y, z = all_data[i][-1][0], all_data[i][-1][1], all_data[i][-1][2]
             f.write(f"\t{atom_num}\t{chain}\t{beadtype}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
             
-        t1 = time.time()
-        print(f"Positions read in. Time taken: {t1 - t0}")
         
         # reading in the bond data        
         f.write("\
 Bonds                                                                               \n\
                                                                                     \n")
         
-        t0 = time.time()
         bond = 0
         atom_num = 1
         for walk in self.polylattice.walkinfo:
@@ -130,9 +123,7 @@ Bonds                                                                           
                 bondtype = all_data[atom_num-1][4]
                 f.write(f"\t{bond}\t{bondtype}\t{(atom_num-1)}\t{atom_num}\n")
             atom_num+=1
-        t1 = time.time()
-        print(f"Bonds read in. Total time taken: {t1 - t0}")        
-                
+
         # crosslinker bonds next. This is slightly more complicated.
 #        print(cross_vals)        
         for i in self.polylattice.crosslinks_loc:

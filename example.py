@@ -11,7 +11,7 @@ print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
 pair_sigma = 0.3 # lennard jones potential length, pair potential information
 pair_epsilon = 0.05
-box_size = 10
+box_size = 1
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 t1 = time.time()
@@ -26,7 +26,7 @@ types={1 : 1.0,
 
 # random walk information--------------------------------------------------------------------
 nums = 1# number of random walks
-size = 500 # size of the chain
+size = 35# size of the chain
 
 # following values determine the bonding 
 rw_kval = 30.0
@@ -43,7 +43,7 @@ for i in range(nums):
     box.random_walk(size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_types = types, termination="retract")
     t1 = time.time()
     total_time+= t1-t0
-    print(f"Random walks: attempt {i+1} successful. Time taken: {t1 - t0}")
+    print(f"Random walks: attempt {i+1} successful. Time taken: {t1 - t0}")    
 print(f"Total time taken for random walk configuration: {total_time}")
 
 # crosslinking information-------------------------------------------------------------------
@@ -84,5 +84,5 @@ t1 = time.time()
 print(f"Simulation file created.Time taken: {t1 - t0}")
 
 box.simulation.view("test_structure.in")
-box.simulation.run(folder="test", mpi=7)
+# box.simulation.run(folder="test", mpi=7)
 
