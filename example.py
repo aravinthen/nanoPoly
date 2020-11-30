@@ -26,9 +26,9 @@ types={1 : 1.0,
 
 # random walk information--------------------------------------------------------------------
 nums = 1# number of random walks
-size = 35# size of the chain
+size = 45# size of the chain
 
-# following values determine the bonding 
+# followxing values determine the bonding 
 rw_kval = 30.0
 rw_cutoff = 3.5
 rw_epsilon = 0.05
@@ -75,7 +75,7 @@ t1 = time.time()
 print(f"Structure file created.Time taken: {t1 - t0}")
 t0 = time.time()
 box.simulation.settings("test_lattice.in", comms=1.9)
-box.simulation.equilibrate(20000, timestep, 0.05, 'langevin', final_temp=0.2, pdamp=1000000, bonding=False, description=desc1, reset=False, dump=100)
+box.simulation.equilibrate(1000, timestep, 0.05, 'langevin', final_temp=0.2, pdamp=1000000, bonding=False, description=desc1, reset=False, dump=1)
 # box.simulation.equilibrate(10000, timestep, 0.8, 'langevin', description=desc1, reset=False, dump=100)
 # box.simulation.equilibrate(10000, timestep, 0.8, 'nose_hoover', description=desc2, reset=False)
 # box.simulation.equilibrate(30000, timestep, 0.8, 'nose_hoover', final_temp=0.5, description=desc3, reset=False)
@@ -83,6 +83,6 @@ box.simulation.equilibrate(20000, timestep, 0.05, 'langevin', final_temp=0.2, pd
 t1 = time.time()
 print(f"Simulation file created.Time taken: {t1 - t0}")
 
-box.simulation.view("test_structure.in")
-# box.simulation.run(folder="test", mpi=7)
+# box.simulation.view("test_structure.in")
+box.simulation.run(folder="small_test", mpi=7)
 

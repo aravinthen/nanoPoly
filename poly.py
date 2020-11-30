@@ -460,7 +460,6 @@ class PolyLattice:
         self.num_beads += numbeads
         self.num_bonds += numbeads - 1
         self.random_walked = True
-        print(self.num_beads)
 
         self.walkinfo.append([ID, numbeads])
         return 1
