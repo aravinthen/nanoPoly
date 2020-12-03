@@ -1,6 +1,7 @@
 * Development Notes
 ** BUG: undetected beads that are too close
-***  50,000 bead simulation: [9/10]
+*** Rates of failure
+****  50,000 bead simulation: [9/10]
  - [X] Attempt 1: Success
  - [X] Attempt 2: Success
  - [X] Attempt 3: Success
@@ -11,7 +12,7 @@
  - [X] Attempt 8: Success
  - [X] Attempt 9: Success
  - [ ] Attempt 10: Failure
-***  75,000 bead simulation: [4/10]
+****  75,000 bead simulation: [4/10]
  - [ ] Attempt 1: Failure
  - [ ] Attempt 2: Failure
  - [X] Attempt 3: Success
@@ -22,7 +23,7 @@
  - [X] Attempt 8: Success
  - [ ] Attempt 9: Failure
  - [ ] Attempt 10: Failure
-*** 100,000 bead simulation: [5/10]
+**** 100,000 bead simulation: [5/10]
  - [X] Attempt 1: Success
  - [X] Attempt 2: Success
  - [X] Attempt 3: Success
@@ -33,3 +34,13 @@
  - [ ] Attempt 8: Failure
  - [ ] Attempt 9: Failure
  - [ ] Attempt 10: Failure
+*** Notes
+- Defining features of the bug:
+  a) The errors themselves have no commonalities aside from that they are more frequent in dense systems.
+  b) *THE BUG DOES NOT APPEAR WHEN A SINGLE WALK IS GENERATED WITHIN THE BOX.*
+     *IT EXCLUSIVELY OCCURS WITH MULTIPLE WALKS*!!!
+- Does the bug scale with density? 
+  *YES*
+** BUG: issue with the bead types detection
+   The bug occurs because the random walk algorithm is fixed at 1,
+   so setting a bead type as "2" will cause it to reaise a key error.

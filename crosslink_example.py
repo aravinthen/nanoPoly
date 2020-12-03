@@ -1,6 +1,6 @@
-# Program Name: polylattice_testing.py
+# Program Name: crosslink_example.py
 # Author: Aravinthen Rajkumar
-# Description: The actual use of the polylattice program will be confined to this file.
+# Description: nanopoly configuration that runs the 
 
 from simulation import Simulation
 from poly import PolyLattice
@@ -11,12 +11,11 @@ print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
 pair_sigma = 0.3 # lennard jones potential length, pair potential information
 pair_epsilon = 0.05
-box_size = 1
+box_size = 20
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 t1 = time.time()
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
-
 
 # types of atom in box-----------------------------------------------------------------------
 # key = types, entry = masses
@@ -25,8 +24,8 @@ types={1 : 1.0,
        3 : 1.0}
 
 # random walk information--------------------------------------------------------------------
-nums = 1# number of random walks
-size = 45# size of the chain
+nums = 10# number of random walks
+size = 10000# size of the chain
 
 # followxing values determine the bonding 
 rw_kval = 30.0
@@ -84,5 +83,6 @@ t1 = time.time()
 print(f"Simulation file created.Time taken: {t1 - t0}")
 
 # box.simulation.view("test_structure.in")
-box.simulation.run(folder="small_test", mpi=7)
+# box.simulation.run(folder="small_test", mpi=7)
+
 

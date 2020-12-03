@@ -66,13 +66,13 @@ class PolyLattice:
         """
         self.boxsize = boxsize # NOT GUARANTEED!!!!
         
-        self.lj_param = sigma # the lj distance between two atoms
+        self.lj_sigma = sigma # the lj distance between two atoms
         self.lj_cut = cutoff
         self.lj_energy = epsilon
         self.crossings = np.zeros((3, 1)) # number of crossings in each direction, [x, y, z]
                                           # encapsulates boundary conditions
 
-        self.cellside = 1.01*self.lj_param
+        self.cellside = round(1.01*self.lj_sigma, 16)
         self.cellnums = m.ceil(self.boxsize/self.cellside)
         self.celltotal = self.cellnums**3
         
@@ -174,24 +174,21 @@ class PolyLattice:
         
         cell_index = self.which_cell(position)
 
-        surround_ind = []
-        for i in range(-1,2):
-            for j in range(-1,2):
-                for k in range(-1,2):
-                    surround_ind.append([(cell_index[0]+i)%self.cellnums,
-                                         (cell_index[1]+j)%self.cellnums,
-                                         (cell_index[2]+k)%self.cellnums])
-                    
-        bead_lists = []
-        for cell in surround_ind:
-            bead_lists.append(self.index(cell).beads)
-
-        surrounding_beads = []
-        for beadlist in bead_lists:
-            for bead in beadlist:
-                surrounding_beads.append(bead)
+        surround_ind = ([(cell_index[0]+i)%self.cellnums,
+                         (cell_index[1]+j)%self.cellnums,
+                         (cell_index[2]+k)%self.cellnums] for i in range(-1,2) for j in range(-1,2) for k in range(-1,2))
         
-        return surrounding_beads
+        walks = []
+        beads = []
+        for cell in surround_ind:
+            pass
+#            for bead in self.index(cell).beads:
+#                pass
+#                if bead[0] not in walks:
+#                    walks.append(bead[0])
+        # print(walks)
+        
+        return [bead for cell in surround_ind for bead in self.index(cell).beads]
 
     def random_walk(self, numbeads, Kval, cutoff, energy, sigma, mini=1.12234, style='fene', phi=None, theta=None, bead_types=None, cell_num=None, termination=None, allowed_failures=10000):
         """
@@ -219,7 +216,7 @@ class PolyLattice:
         ID = self.num_walks + 1
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
-        if sigma < self.lj_param:
+        if sigma < self.lj_sigma:
             print("You cannot set the bond length to be less than the pair potential")
             print("length. Either modify the bond length or increase the pair")
             print("potential length in the PolyLattice box.")
@@ -344,7 +341,7 @@ class PolyLattice:
                     else:
                         real_j = j[-1]
                 
-                    if (np.linalg.norm(np.array(current_pos) - np.array(real_j)) < self.lj_param):
+                    if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
                         current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
                                                 random.uniform(cell_pos[1], cell_bound[1]),
                                                 random.uniform(cell_pos[2], cell_bound[2])])
@@ -381,31 +378,29 @@ class PolyLattice:
                 issues = 0
                 index_c = self.which_cell(current_pos)
                 for j in neighbours:            
-                    if len(j) == 0:
-                        continue
-
                     index_n = self.which_cell(j[-1])
+                    
                     # deals with instances of periodicity, no different from the code above.
                     # to obtain the constant, calculate the maximum norm of two adjacent cell indices
-                    
                     if self.cellnums-1 in np.abs(index_c - index_n):
                         period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
                         real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
                     else:
                         real_j = j[-1]                        
-                
                     
-                    if (np.linalg.norm(np.array(current_pos) - np.array(real_j)) < self.lj_param):
+                    if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
                         issues += 1
-                        break
-                        
-                if issues > 0:
+                
+                if issues > 0:        
                     too_close = True
                     current_pos = previous
                 else:
                     too_close = False
 
+                # This has to be here: the failure condition is fallged when generation_count = 0
                 generation_count += 1
+
+                # FAILURE CONDITIONS ----------------------------------------------------------------------------------
                 if generation_count % allowed_failures == 0:
                     if termination == "break":
                         new_numbeads = numbeads - i
@@ -429,7 +424,7 @@ class PolyLattice:
                         self.index(current_cell).beads.remove(bad_bead)
 
                         progress = self.walk_data(ID)
-                        trial_pos = progress[-1][-1]
+                        current_pos = progress[-1][-1]
 
                     else:                        
                         raise Exception("Program terminated.")
@@ -443,9 +438,11 @@ class PolyLattice:
                         print("b) a larger amount of lattice space,")
                         print("c) a smaller step distance.")
                         
+                # -------------------------------------------------------------------------------------------------------                        
             current_pos = trial_pos
-
             current_cell = self.which_cell(current_pos)
+            
+            neighbours = self.check_surroundings(current_pos)                    
             bead_data = [ID,
                          i,
                          (i % len(bead_types))+1,
@@ -532,7 +529,7 @@ class PolyLattice:
                         else:
                             real_j = j[-1]
                 
-                        if (np.linalg.norm(np.array(trial_pos) - np.array(real_j)) < self.lj_param):
+                        if (np.linalg.norm(np.array(trial_pos) - np.array(real_j)) < self.lj_sigma):
                             trial_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
                                                   random.uniform(cell_pos[1], cell_bound[1]),
                                                   random.uniform(cell_pos[2], cell_bound[2])])
@@ -742,7 +739,7 @@ class PolyLattice:
                             else:
                                 real_neighbour = neighbour[-1]                        
 
-                            if np.linalg.norm(real_neighbour - pot_cross_loc) < self.lj_param:
+                            if np.linalg.norm(real_neighbour - pot_cross_loc) < self.lj_sigma:
                                 issue = 1
                                 break
 
@@ -845,7 +842,7 @@ class PolyLattice:
         average = average/num_distances
         print(f"Closest distance: {round(closest,5)} [between {catom1} and {catom2}]")
 
-        if closest < self.lj_param:
+        if closest < self.lj_sigma:
             print("The closest distance is much less than the specified Lennard-Jones parameter.")
             print("This is a dangerous simulation to run. Rerunning nanoPoly with different")
             print("initial values is highly encouraged.")
