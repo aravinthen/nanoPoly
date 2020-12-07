@@ -177,17 +177,7 @@ class PolyLattice:
         surround_ind = ([(cell_index[0]+i)%self.cellnums,
                          (cell_index[1]+j)%self.cellnums,
                          (cell_index[2]+k)%self.cellnums] for i in range(-1,2) for j in range(-1,2) for k in range(-1,2))
-        
-        walks = []
-        beads = []
-        for cell in surround_ind:
-            pass
-#            for bead in self.index(cell).beads:
-#                pass
-#                if bead[0] not in walks:
-#                    walks.append(bead[0])
-        # print(walks)
-        
+
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
 
     def random_walk(self, numbeads, Kval, cutoff, energy, sigma, mini=1.12234, style='fene', phi=None, theta=None, bead_types=None, cell_num=None, termination=None, allowed_failures=10000):
@@ -322,34 +312,57 @@ class PolyLattice:
         bead_number = 0
 
         # trial for the initial position
-        current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
-                                random.uniform(cell_pos[1], cell_bound[1]),
-                                random.uniform(cell_pos[2], cell_bound[2])])
-                    
         invalid_start = True
+        total_failure = False
+        failure = 0
         while invalid_start:
+            current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
+                                    random.uniform(cell_pos[1], cell_bound[1]),
+                                    random.uniform(cell_pos[2], cell_bound[2])])                    
             index_c = self.which_cell(current_pos)                    
             neighbours = self.check_surroundings(current_pos)
-            if len(neighbours)==0:
-                invalid_start = False
-            else:
-                for j in neighbours:
-                    index_n = self.which_cell(j[-1])
-                    if self.cellnums-1 in np.abs(index_c - index_n):
-                        period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
-                        real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
-                    else:
-                        real_j = j[-1]
+            
+            issues = 0
+            for j in neighbours:
+                index_n = self.which_cell(j[-1])
+                if self.cellnums-1 in np.abs(index_c - index_n):
+                    period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                    real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                else:
+                    real_j = j[-1]
                 
-                    if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
-                        current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
-                                                random.uniform(cell_pos[1], cell_bound[1]),
-                                                random.uniform(cell_pos[2], cell_bound[2])])
-                    else:
-                        invalid_start = False
+                if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
+                    issues+=1
+                    break
+
+            if issues > 0:
+                invalid_start = True
+                failure+=1
+                if failure > allowed_failures:
+                    total_failure = True
+                    invalid_start = False
+
+            else:
+                invalid_start = False
+                failure = 0        
+
+        if total_failure == True:
+            print("\nThe number of permitted failures for the starting position have")
+            print("exceeded the set value. The box is too dense for valid position to")
+            print("be found.")
+            print("It is recommended to run the algorithm in a less packed box.")
+            raise Exception("Program terminated.")
 
         # The full data entry for keeping track of the bead.
-        bead_data = [ID, bead_number, 1, bead_types[1], bond_type, current_pos]
+        bead_data = [ID,
+                     bead_number,
+                     1,
+                     bead_types[1],
+                     bond_type,
+                     self.num_beads,
+                     current_pos]
+
+        self.num_beads+=1
         self.index(current_cell).beads.append(bead_data)
         
         # Begin loop here.
@@ -373,10 +386,11 @@ class PolyLattice:
                     
                 previous = current_pos
                 current_pos = trial_pos
+
                 neighbours = self.check_surroundings(current_pos)
-                
                 issues = 0
                 index_c = self.which_cell(current_pos)
+                # neighbor checking takes place here.
                 for j in neighbours:            
                     index_n = self.which_cell(j[-1])
                     
@@ -386,21 +400,22 @@ class PolyLattice:
                         period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
                         real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
                     else:
-                        real_j = j[-1]                        
-                    
-                    if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
+                        real_j = j[-1]                                            
+                        
+                    if round(np.linalg.norm(current_pos - real_j), 5) < self.lj_sigma:
                         issues += 1
-                
-                if issues > 0:        
+                        break 
+
+                if issues > 0:      
                     too_close = True
                     current_pos = previous
                 else:
                     too_close = False
 
-                # This has to be here: the failure condition is fallged when generation_count = 0
+                # This has to be here: the failure condition is False when generation_count = 0
                 generation_count += 1
 
-                # FAILURE CONDITIONS ----------------------------------------------------------------------------------
+                # FAILURE CONDITIONS -------------------------------------------------------------
                 if generation_count % allowed_failures == 0:
                     if termination == "break":
                         new_numbeads = numbeads - i
@@ -440,21 +455,22 @@ class PolyLattice:
                         
                 # -------------------------------------------------------------------------------------------------------                        
             current_pos = trial_pos
-            current_cell = self.which_cell(current_pos)
-            
-            neighbours = self.check_surroundings(current_pos)                    
+            current_cell = self.which_cell(current_pos)                            
+
             bead_data = [ID,
                          i,
                          (i % len(bead_types))+1,
                          bead_types[(i % len(bead_types))+1],
                          bond_type,
+                         self.num_beads,
                          current_pos]
             
+            self.num_beads += 1
             self.index(current_cell).beads.append(bead_data)
+
             i+=1
 
         self.num_walks += 1
-        self.num_beads += numbeads
         self.num_bonds += numbeads - 1
         self.random_walked = True
 

@@ -159,7 +159,7 @@ Bonds                                                                           
         
         
         if comms == None:
-            comms = 2*self.polylattice.lj_param
+            comms = 2*self.polylattice.lj_sigma
 
         def dictionary_shuffle(my_dict, key_of_list):
             """
@@ -224,7 +224,7 @@ neighbor      0.4 bin                                                           
 neigh_modify  every 10 one 10000                                                      \n\
 comm_modify   mode single cutoff {comms} vel yes                                      \n\
 pair_style    lj/cut {self.polylattice.lj_cut}                                        \n\
-pair_coeff    * * {self.polylattice.lj_energy} {self.polylattice.lj_param}            \n\
+pair_coeff    * * {self.polylattice.lj_energy} {self.polylattice.lj_sigma}            \n\
 ")
         # now it's time to read in the bond information.
         styles_dict = dictionary_shuffle(self.polylattice.bonds, -1)        
@@ -292,7 +292,7 @@ dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs 
 ")
             f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
-fix             1 all nve/limit {self.polylattice.lj_param}\n\
+fix             1 all nve/limit {self.polylattice.lj_sigma}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
 ")
             if bonding == True:

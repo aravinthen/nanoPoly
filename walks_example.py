@@ -28,15 +28,16 @@ types={1 : 1.0,
        2 : 1.0,       
        3 : 1.0}
 # random walk information--------------------------------------------------------------------
-nums = 10# number of random walks
-size = 4# size of the chain
-# followxing values determine the bonding 
+nums = 3 # number of random walks
+size = 5 # size of the chain
+
+# following values determine the bonding 
 rw_kval = 30.0
 rw_cutoff = 3.5
 rw_epsilon = 0.05
 rw_sigma = 0.5
 
-# SERIALIZED VERSION: 
+errors = 0
 total_time = 0
 for i in range(nums):
     t0 = time.time()    
@@ -47,12 +48,15 @@ for i in range(nums):
     print(f"Random walks: attempt {i+1} successful. Time taken: {t1 - t0}")    
 print(f"Total time taken for random walk configuration: {total_time}")
 
+# ERROR TESTING ---------------------------------------------------------------------------
 shortest_distance = 100
 errors = 0
+zeros = 0
 mean_occ = 0
 print(f"\nNumber of cells per side: {box.cellnums}")
 print(f"-------------------------------------------------------------------------------")
 print(f"Distance Errors:")
+print(f"G.num_b\tG.num_n\tWalk_b\tWalk_n\twnum_b\twnum_n\tDistance")
 for bead in box.walk_data():
     error_count = 0
     nlist = box.check_surroundings(bead[-1])
@@ -61,24 +65,28 @@ for bead in box.walk_data():
     for neighbour in box.check_surroundings(bead[-1]):
         distance = np.linalg.norm(bead[-1] - neighbour[-1])
         if distance < pair_sigma and distance != 0.0:
-            print(f"{bead[1]+size*bead[0]}\t{neighbour[1]+size*neighbour[0]}\t{bead[0]}\t{neighbour[0]}\t{box.which_cell(bead[-1])}\t{box.which_cell(neighbour[-1])}\t{occ}\t{distance}")
+            print(f"{bead[-2]}\t{neighbour[-2]}\t{bead[0]}\t{neighbour[0]}\t{bead[1]}\t{neighbour[1]}\t{distance}")
             error_count+=1
+            if bead[1] == 0 or neighbour[1] == 0:
+                zeros +=1
     if error_count > 0:
         errors+=1
 print(f"-------------------------------------------------------------------------------")
 print(f"The number of errors in distance calculation: {errors}/{box.num_beads}")
 print(f"The check_surroundings algorithm messes up {100*(errors)/box.num_beads}% of the time.")
+print(f"Of these errors, {zeros} occur with the first bead of a new walk.")
 print(f"The mean number of occupants in a surroundings check is {mean_occ/box.num_beads}")
-            
-# timestep = 0.01
+# -----------------------------------------------------------------------------------------
+
+timestep = 0.01
 t0 = time.time()
 box.simulation.structure("test_structure.in")
 t1 = time.time()
 print(f"Structure file created.Time taken: {t1 - t0}")
-# t0 = time.time()
-# box.simulation.settings("test_lattice.in", comms=1.9)
-# box.simulation.equilibrate(1000, timestep, 0.05, 'langevin', final_temp=0.2, pdamp=1000000, bonding=False, description=desc1, reset=False, dump=1)
+box.simulation.settings("test_lattice.in", comms=1.9)
 
+desc1 = "Testing"
+box.simulation.equilibrate(5000, timestep, 0.05, 'langevin', final_temp=0.05, bonding=False, description=desc1, reset=False, dump=0)
 # box.simulation.equilibrate(10000, timestep, 0.8, 'langevin', description=desc1, reset=False, dump=100)
 # box.simulation.equilibrate(10000, timestep, 0.8, 'nose_hoover', description=desc2, reset=False)
 # box.simulation.equilibrate(30000, timestep, 0.8, 'nose_hoover', final_temp=0.5, description=desc3, reset=False)
@@ -87,7 +95,8 @@ print(f"Structure file created.Time taken: {t1 - t0}")
 # print(f"Simulation file created.Time taken: {t1 - t0}")
 
 # box.simulation.view("test_structure.in")
-# box.simulation.run(folder="small_test", mpi=7)
+# add mpi=7 argument to run with mpi
+box.simulation.run(folder="small_test",)
 
 
 
