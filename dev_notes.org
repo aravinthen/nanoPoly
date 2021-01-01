@@ -1,46 +1,23 @@
 * Development Notes
-** BUG: undetected beads that are too close
-*** Rates of failure
-****  50,000 bead simulation: [9/10]
- - [X] Attempt 1: Success
- - [X] Attempt 2: Success
- - [X] Attempt 3: Success
- - [X] Attempt 4: Success
- - [X] Attempt 5: Success
- - [X] Attempt 6: Success
- - [X] Attempt 7: Success
- - [X] Attempt 8: Success
- - [X] Attempt 9: Success
- - [ ] Attempt 10: Failure
-****  75,000 bead simulation: [4/10]
- - [ ] Attempt 1: Failure
- - [ ] Attempt 2: Failure
- - [X] Attempt 3: Success
- - [ ] Attempt 4: Failure
- - [X] Attempt 5: Success
- - [X] Attempt 6: Success
- - [ ] Attempt 7: Failure
- - [X] Attempt 8: Success
- - [ ] Attempt 9: Failure
- - [ ] Attempt 10: Failure
-**** 100,000 bead simulation: [5/10]
- - [X] Attempt 1: Success
- - [X] Attempt 2: Success
- - [X] Attempt 3: Success
- - [ ] Attempt 4: Failure
- - [X] Attempt 5: Success
- - [ ] Attempt 6: Failure
- - [X] Attempt 7: Success
- - [ ] Attempt 8: Failure
- - [ ] Attempt 9: Failure
- - [ ] Attempt 10: Failure
-*** Notes
+** ANALYSIS
+*** Methods of obtaining stress-strain curves
+**** Current method
+
+**** Potential methods
+
+
+** Potential Structures
+*** Epoxy resins
+    Resins are examples of polymeric matter that are formed by the crosslinking of short chains with reactive endpoints.
+    These chains are mixed with *hardeners*, molecules that possess four functional groups that match with the reactive endpoints.
+** Bugs
+*** DONE BUG: undetected beads that are too close
 - Defining features of the bug:
   a) The errors themselves have no commonalities aside from that they are more frequent in dense systems.
   b) *THE BUG DOES NOT APPEAR WHEN A SINGLE WALK IS GENERATED WITHIN THE BOX.*
      *IT EXCLUSIVELY OCCURS WITH MULTIPLE WALKS*!!!
 - Does the bug scale with density? 
   *YES*
-** BUG: issue with the bead types detection
+*** TODO BUG: issue with the bead types detection
    The bug occurs because the random walk algorithm is fixed at 1,
    so setting a bead type as "2" will cause it to reaise a key error.

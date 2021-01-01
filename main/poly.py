@@ -12,12 +12,13 @@
 import numpy as np
 import math as m
 import time
-import sys
-import multiprocessing
 import random
 
+import sys
 sys.path.append(".")
+
 from simulation import Simulation
+from analysis import Analysis
 
 class PolyLattice:
     """
@@ -28,13 +29,14 @@ class PolyLattice:
                                   3. celltotal = total number of cells.
                                   4. Cells = list of cells in lattice. each list element is Cell class
 
-    Attributes for a Cell:        1. i, j, j, ijk: indices (and tuple of indices).
+    Attributes for a Cell:        1. i, j, k, ijk: indices (and tuple of indices).
                                   2. position: the position of cell origin relative to lattice origin
                                   3. cellsides: inherited from PolyLattice. Same as cellside
                                   4. forbidden: BOOLEAN -  Cannot host atoms if this is valued True
     """
     
     sim_attr = Simulation
+    ana_attr = Analysis
     
     class Cell:
         def __init__(self, index1, index2, index3, position, cellsides):            
@@ -97,8 +99,9 @@ class PolyLattice:
                             # used to control the bond writing process in the simulation class
         
         self.nanostructure = None
-        self.simulation = Simulation(self) # attaches to the simulation class
-
+        self.simulation = Simulation(self) # the simulation class
+        self.analysis = Analysis(self) # the analysis class
+        
         # counts
         self.num_walks = 0
         self.num_bonds = 0
@@ -511,7 +514,6 @@ class PolyLattice:
 
         bond = sigma
         self.types[bead_type] = mass
-
         # Flagging up the presence of unbonded crosslinks within the system
         self.cl_unbonded = True
         self.cl_bonding = [bead_type, bond_type, allowed, bdist, ibonds, jbonds,prob]
@@ -565,7 +567,7 @@ class PolyLattice:
         
                 
 
-    def bonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, style='fene', forbidden=None, reaction=True, fail_count=30, selflinking=10, multilink=False):
+    def bonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, style='fene', forbidden=[], reaction=True, fail_count=30, selflinking=10, multilink=False):
         """ 
         This method initializes crosslinks that are already bonded within the system.
         Carries out the crosslinking procedure in the system.
@@ -575,12 +577,13 @@ class PolyLattice:
                    bond:          the main range at which molecules can be linked.
                    mass:          mass of the crosslinker cell
                    forbidden:     a list of bead types that are forbidden to crosslink
-                   reaction:      whether the links were formed via a crosslinking reaction or not
+n                   reaction:      whether the links were formed via a crosslinking reaction or not
                                   all this does is add an atom to the middle of the cross-linkers 
                    fail_count:    the number of attempts the function will make to find a valid crosslink.
                                   When 10 different crosslink sites are found to fail, the algorithm will 
                                   cease to function.
-                   selflinking:   allows the chain to link with itself after a series of links have passed.
+                   selflinking:   allows the chain to link with itself after a series of links have pass
+ed.
                    multilink:     allows a bead to link multiple times.                   
         """
         def rotation(axis, theta):
@@ -621,32 +624,32 @@ class PolyLattice:
             b) Makes sure that the bonds are not the same
             c) Incorporates an optional condition that disallows crosslinking between the same beads
             """
-            valid = False
 
-            all_beads = [bead for beads in accepted_links for bead in beads]
-
+            all_beads = [bead[-2] for beads in accepted_links for bead in beads]
+            
             count = 0
             if multilink==False:
-                while not valid:
-                    count+=1
-                    link = random.choice(potential_pairs)
-                    
-                    # makes sure the links haven't already been accepted                
-                    cond1 = (link[0] in all_beads) or (link[1] in all_beads)                 
-                    if not cond1:
-                        valid = True
-
+                invalid = True
+                
+                while invalid:
                     if count>len(potential_pairs):
                         return 0
                         break
-                
+                    
+                    link = random.choice(potential_pairs)                    
+                    # makes sure the links haven't already been accepted    
+                    if (link[0][-2] in all_beads) or (link[1][-2] in all_beads):
+                        count += 1
+                    else:
+                        invalid = False
             else:
                 raise EnvironmentError("Multilinking not yet supported!")
+            
             return link
             
         
         if self.random_walked == False:
-            raise EnvironmentError("Box has not been populated with a random walk. Please use the random walk method and try again.")
+            raise EnvironmentError("Box has not been populated with any beads. Please use the random walk method and try again.")
 
         # adding the bond detail of the crosslink to the system
         repeat = 0
@@ -655,6 +658,7 @@ class PolyLattice:
                 repeat += 1
         if repeat >= len(self.bonds):
             self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
+
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
         bond = sigma
 
@@ -667,9 +671,11 @@ class PolyLattice:
                     for neighbour in neighbours:
                         # considering neighbours that are higher in the index, neighbours are further along the chain
                         # not of the same random walk.
-                        cond1 = ((neighbour[0] > bead[0]) or (neighbour[1] - bead[1] > selflinking)) 
-                        cond2 = (np.linalg.norm(neighbour[-1] - bead[-1]) < 2*bond) # within linking distance
-                        cond3 = (neighbour[2] not in forbidden) # allowed to link                    
+                        cond1 = ((neighbour[0] != bead[0]) or ((neighbour[0] == bead[0] and (neighbour[1] - bead[1] > selflinking))))
+                        # within linking distance
+                        cond2 = (np.linalg.norm(neighbour[-1] - bead[-1]) < 2*bond)
+                        # allowed to link                    
+                        cond3 = (neighbour[2] not in forbidden)
                         
                         if cond1 and cond2 and cond3:
                             potential_pairs.append((neighbour, bead))
@@ -766,7 +772,7 @@ class PolyLattice:
                             invalid = False
                             rot_failed = 0 # resets failure counter
 
-                        if rot_failed > 50:
+                        if rot_failed > fail_count:
                             # flags a message demonstrating that the link itself is not capable of crosslinking
                             bad_links += 1
                             failure = 1
@@ -779,7 +785,7 @@ class PolyLattice:
                             print("The number of failures have surpassed the fail count.")
                             print("It is highly unlikely that there any valid cross-linking sites available.")
                             print("The simulation will continue with the number of links that have already")
-                            print("been made. ")                            
+                            print("been made. ")
                             print(f"Number of crosslinks currently in systems: {len(accepted_links)}")
                             print("---------------------------------------------------------------------------")
                             complete_failure = 1
@@ -791,11 +797,12 @@ class PolyLattice:
                             # we have crosslinkers - they can be added to the types dictionary
                             self.types[len(self.types)+1] = mass
                             
-                        bead = [self.num_walks,
+                        bead = [self.num_walks+1,
                                 0,
                                 len(self.types),
                                 mass,
                                 bond_type,
+                                self.num_beads,
                                 pot_cross_loc]
                         
                         self.num_beads += 1
@@ -808,6 +815,7 @@ class PolyLattice:
 
                 # adds crosslinker atom to bead-type list
                 self.crosslinks_loc += crosslink_data
+                self.num_walks += 1
                 
 
                 # termination condition

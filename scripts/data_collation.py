@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from operator import itemgetter
 import numpy as np
 
+import sys
+sys.path.insert(0, '../main')
+
 #----------------------------------------------------------------------------------------
 # REPLACE THE PATH WITH THE DATASET PRODUCED BY YOUR CODE.
 #----------------------------------------------------------------------------------------

@@ -10,7 +10,6 @@ import os.path
 from os import path
 import subprocess
 import glob
-import multiprocessing
 import shutil
 from datetime import date
 today = date.today()
