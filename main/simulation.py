@@ -303,11 +303,11 @@ fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n
                     for jparam in b_data[2]:
                         if b_data[6] == None:
                             f.write(f"\
-fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} iparam {b_data[4]} jparam {b_data[5]} \n\
+fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} iparam {b_data[4]} {b_data[0]} jparam {b_data[5]+2} {jparam} \n\
 ")
                         else:
                             f.write(f"\
-fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} jparam {b_data[5]} \n\
+fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} {b_data[0]} jparam {b_data[5]+2} {jparam}\n\
 ") 
             
             f.write(f"\

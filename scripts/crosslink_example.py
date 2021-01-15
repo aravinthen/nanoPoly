@@ -106,7 +106,17 @@ box.simulation.equilibrate(5000,
                            description=desc1,                                                           
                            reset=False,                                                                 
                            dump=200)                                                                    
-                                                                                                        
+
+box.simulation.equilibrate(5000,                                                                        
+                           timestep,                                                                    
+                           0.05,                                                                        
+                           'langevin',                                                                  
+                           final_temp=0.05,                                                             
+                           bonding=True,                                                               
+                           description=desc1,                                                           
+                           reset=False,                                                                 
+                           dump=200)    
+
 box.simulation.equilibrate(10000,                                                                       
                            timestep,                                                                    
                            0.1,                                                                         
