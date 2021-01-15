@@ -1,8 +1,10 @@
 # Program Name: analysis.py
 # Author: Aravinthen Rajkumar
-# Description: Analysis routines for data produced by poly and simulation.
+# Description: Analysis routines for data produced by poly.
+#              This module is meant for pre-simulation processing, acting on the polylattice
+#              box object itself.
 
-# ERROR TESTING ---------------------------------------------------------------------------
+
 
 import numpy as np
 

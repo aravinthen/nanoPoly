@@ -47,7 +47,7 @@ for i in range(nums):
     box.random_walk(size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_types = types, termination="retract")
     t1 = time.time()
     total_time+= t1-t0
-    print(f"Random walks: attempt {i+1} successful. Time taken: {t1 - t0}")    
+    print(f"Random walks: attempt {i+1} successful. Time taken: {t1 - t0}")
 print(f"Total time taken for random walk configuration: {total_time}")
 
 
@@ -72,6 +72,4 @@ box.simulation.equilibrate(5000, timestep, 0.05, 'langevin', final_temp=0.05, bo
 box.simulation.view("test_structure.in")
 # add mpi=7 argument to run with mpi
 # box.simulation.run(folder="small_test",)
-
-
 

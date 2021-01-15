@@ -2,10 +2,9 @@
 ** ANALYSIS
 *** Methods of obtaining stress-strain curves
 **** Current method
-
+     Simply plotting the pressure against the extension.
 **** Potential methods
-
-
+     *The Irving-Kirkwood Formalism*     
 ** Potential Structures
 *** Epoxy resins
     Resins are examples of polymeric matter that are formed by the crosslinking of short chains with reactive endpoints.

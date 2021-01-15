@@ -307,11 +307,10 @@ class PolyLattice:
         else:
             current_cell = np.array(cell_num)
 
-
-        # Initial values of the random walk
         cell_pos = self.index(current_cell).position
         cell_bound = cell_pos + self.cellside
-
+        
+        # Initial values of the random walk
         bead_number = 0
 
         # trial for the initial position
@@ -336,7 +335,7 @@ class PolyLattice:
                 
                 if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
                     issues+=1
-                    break
+                    break # stop checking neighbours
 
             if issues > 0:
                 invalid_start = True
@@ -481,7 +480,7 @@ class PolyLattice:
         return 1
 
 
-    def unbonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, bdist=None, prob=None, style='fene', allowed=None, ibonds=2, jbonds=1):
+    def unbonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, bdist=None, prob=None, style='fene', allowed=None, allowed_failures = 50, ibonds=2, jbonds=1):
         """ 
         This method initializes crosslinks that will move around the box before bonding within the simulation.
         This makes use of the "self.unbonded_links" paramater, which stores the properties of the bonds that will be created.
@@ -518,55 +517,78 @@ class PolyLattice:
         self.cl_unbonded = True
         self.cl_bonding = [bead_type, bond_type, allowed, bdist, ibonds, jbonds,prob]
 
-        for i in range(crosslinks):
-            # pick a random cell
-            current_cell = np.array([random.randrange(0, self.cellnums),
-                                     random.randrange(0, self.cellnums),
-                                     random.randrange(0, self.cellnums)])
         
-            cell_pos = self.index(current_cell).position
-            cell_bound = cell_pos + self.cellside
-
+        for i in range(crosslinks):                    
             # trial for the initial position
-            trial_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
-                                  random.uniform(cell_pos[1], cell_bound[1]),
-                                  random.uniform(cell_pos[2], cell_bound[2])])
 
             invalid_pos = True
+            total_failure = False
+            failure = 0
             while invalid_pos:
+                # select a random cell
+                current_cell = np.array([random.randrange(0, self.cellnums),
+                                         random.randrange(0, self.cellnums),
+                                         random.randrange(0, self.cellnums)])
+
+                # obtain the bounds of previously selected cell
+                cell_pos = self.index(current_cell).position
+                cell_bound = cell_pos + self.cellside
+
+                # find a position within the cell
+                trial_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
+                                      random.uniform(cell_pos[1], cell_bound[1]),
+                                      random.uniform(cell_pos[2], cell_bound[2])])
+                
                 index_c = self.which_cell(trial_pos)                    
                 neighbours = self.check_surroundings(trial_pos)
-                if len(neighbours)==0:
-                    invalid_pos = False
+                
+                issues = 0
+                for j in neighbours:
+                    index_n = self.which_cell(j[-1])
+                    if self.cellnums-1 in np.abs(index_c - index_n):
+                        period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                        real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                    else:
+                        real_j = j[-1]
+                
+                    if (np.linalg.norm(trial_pos - real_j) < self.lj_sigma):
+                        issues+=1
+                        break # breaks out of the neighborlist search
+                    
+                if issues > 0:
+                    invalid_pos = True
+                    failure += 1                    
+                    if failure > allowed_failures:
+                        total_failure = True
+                        invalid_pos = False
                 else:
-                    for j in neighbours:
-                        index_n = self.which_cell(j[-1])
-                        if self.cellnums-1 in np.abs(index_c - index_n):
-                            period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
-                            real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
-                        else:
-                            real_j = j[-1]
+                    invalid_pos = False
+                    failure = 0
+                    
+            if total_failure == True:
+                print("---------------------------- CROSSLINK FAILURE ----------------------------")
+                print("The number of failures have surpassed the fail count.")
+                print("It is highly unlikely that the box is too dense to accomodate any more links.")
+                print("The simulation will continue with the number of links that have already")
+                print("been made. ")
+                print(f"Number of crosslinks currently in systems: {i}")
+                print("---------------------------------------------------------------------------")
                 
-                        if (np.linalg.norm(np.array(trial_pos) - np.array(real_j)) < self.lj_sigma):
-                            trial_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
-                                                  random.uniform(cell_pos[1], cell_bound[1]),
-                                                  random.uniform(cell_pos[2], cell_bound[2])])
-                        else:
-                            invalid_pos = False
+                return 0
+            bead = [self.num_walks+1,
+                    0,
+                    len(self.types),
+                    mass,
+                    bond_type,
+                    self.num_beads,
+                    trial_pos]
+                        
+                                                                        
+            self.index(current_cell).beads.append(bead)
+            self.num_beads += 1
 
-                bead_data = [self.num_walks,
-                             0,
-                             len(self.types),
-                             mass,
-                             0,
-                             trial_pos]
-        
-                self.index(current_cell).beads.append(bead_data)
-                self.num_beads += 1
 
-        
                 
-
     def bonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, style='fene', forbidden=[], reaction=True, fail_count=30, selflinking=10, multilink=False):
         """ 
         This method initializes crosslinks that are already bonded within the system.
@@ -830,49 +852,6 @@ ed.
                 self.crosslinks_loc = crosslink_data
         
 
-                
-    def verify(self,):
-        """
-        A verification function. How safe is my molecular dynamics simulation?
-        Returns True if the atoms are all far enough to be safely simulated.
-        """
-        print("Verification of system:")
-        all_data = self.walk_data()
-        closest = np.linalg.norm(all_data[0][-1] - all_data[1][-1])
-        catom1 = 0
-        catom2 = 1
-        
-        datom1 = 0 
-        datom2 = 1
-        
-        # used to calculate statistics
-        average = 0
-        num_distances = 0
-        
-        for i in range(len(all_data)):
-            for j in range(i+1, len(all_data)):
-                distance = np.linalg.norm(all_data[i][-1] - all_data[j][-1])
-                if distance < closest:
-                    closest = distance
-                    catom1 = i                    
-                    catom2 = j
-                    
-                    datom1 = all_data[i][-1]
-                    datom2 = all_data[j][-1]
-                    
-                average += distance
-                num_distances += 1
-
-        average = average/num_distances
-        print(f"Closest distance: {round(closest,5)} [between {catom1} and {catom2}]")
-
-        if closest < self.lj_sigma:
-            print("The closest distance is much less than the specified Lennard-Jones parameter.")
-            print("This is a dangerous simulation to run. Rerunning nanoPoly with different")
-            print("initial values is highly encouraged.")
-            return False
-        else:
-            return True
 
     #---------------------------------------------------------------------------------------------
     # Data gathering and plotting.
