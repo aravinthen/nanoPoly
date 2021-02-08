@@ -573,8 +573,9 @@ class PolyLattice:
                 print("been made. ")
                 print(f"Number of crosslinks currently in systems: {i}")
                 print("---------------------------------------------------------------------------")
-                
+                self.cl_bonding.append(i)                
                 return 0
+
             bead = [self.num_walks+1,
                     0,
                     len(self.types),
@@ -587,6 +588,7 @@ class PolyLattice:
             self.index(current_cell).beads.append(bead)
             self.num_beads += 1
 
+        self.cl_bonding.append(crosslinks)
 
                 
     def bonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, style='fene', forbidden=[], reaction=True, fail_count=30, selflinking=10, multilink=False):

@@ -216,8 +216,17 @@ atom_style         {atom_style}                                                 
 log                log.${{simulation}}.txt                                            \n\
                                                                                       \n\
 # read data from object into file                                                     \n\
+")
+        if self.polylattice.cl_unbonded == True:
+            f.write(f"\
+read_data          ${{structure}} extra/bond/per/atom {self.polylattice.cl_bonding[0]*2}   \n\
+")
+        else:
+            f.write(f"\
 read_data          ${{structure}}                                                     \n\
-                                                                                      \n\
+")
+                                                   
+        f.write(f"\n\
 # define interactions                                                                 \n\
 neighbor      0.4 bin                                                                 \n\
 neigh_modify  every 10 one 10000                                                      \n\
@@ -251,8 +260,8 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data
         dynamics   - the type of equilibration that'll be taking place
                      'langevin' uses the nve and langevin thermostats
                      'npt' carries out npt dynamics
+        bonding    - dependent on whether crosslinking is performed unbonded.
         final_temp - used for heating and cooling equilibrations
-        velocity   - dependent on the 
         """
         self.equibs+=1
         
@@ -349,7 +358,7 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
             f.close()
 
-    def deform(self, steps, timestep, strain, temp, tdamp=None, pdamp=1000, drag=2.0, datafile=True, output_steps=100, reset=True, data=('step','temp','pxx', 'pyy', 'pzz', 'lx', 'ly', 'lz'), description = None):
+    def deform(self, steps, timestep, strain, temp, tdamp=None, pdamp=1000, drag=2.0, datafile=True, output_steps=100, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), description = None):
         """
         Carries out the deformation of the tyres. 
         """
