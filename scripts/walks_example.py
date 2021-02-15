@@ -19,7 +19,7 @@ print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
 pair_sigma = 0.3 # lennard jones potential length, pair potential information
 pair_epsilon = 0.05
-box_size = 20.0
+box_size = 1.0
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 t1 = time.time()
@@ -31,8 +31,8 @@ types={1 : 1.0,
        2 : 1.0,       
        3 : 1.0}
 # random walk information--------------------------------------------------------------------
-nums = 10 # number of random walks
-size = 1000 # size of the chain
+nums = 2 # number of random walks
+size = 10 # size of the chain
 
 # following values determine the bonding 
 rw_kval = 30.0
@@ -60,16 +60,41 @@ box.simulation.settings("test_lattice.in", comms=1.9)
 
 box.analysis.error_check()
 
-desc1 = "Testing"
-box.simulation.equilibrate(5000, timestep, 0.05, 'langevin', final_temp=0.05, bonding=False, description=desc1, reset=False, dump=0)
-# box.simulation.equilibrate(10000, timestep, 0.8, 'langevin', description=desc1, reset=False, dump=100)
-# box.simulation.equilibrate(10000, timestep, 0.8, 'nose_hoover', description=desc2, reset=False)
-# box.simulation.equilibrate(30000, timestep, 0.8, 'nose_hoover', final_temp=0.5, description=desc3, reset=False)
-# box.simulation.deform(100000, timestep, 3e-2, 0.5, reset=False, description=desc4)
-# t1 = time.time()
-# print(f"Simulation file created.Time taken: {t1 - t0}")
+desc1 = "Initialization"                                                                               
+desc2 = "Equilibration"                                                                                
+desc3 = "Deformation procedure"    
 
-box.simulation.view("test_structure.in")
+box.simulation.equilibrate(500,
+                           timestep,
+                           0.05,
+                           'langevin',
+                           final_temp=0.1,
+                           bonding=False,
+                           description=desc1,
+                           reset=False,
+                           dump=10)           
+
+box.simulation.equilibrate(1000,
+                           timestep,
+                           0.1,
+                           'langevin',
+                           final_temp=0.3,
+                           description=desc1,
+                           reset=False)    
+
+box.simulation.equilibrate(1000,
+                           timestep,
+                           0.3,
+                           'nose_hoover',
+                           description=desc2,
+                           reset=False)
+
+# vector that controls nature of deformation.
+strain = [-1e-2, -1e-2, -1e-2]
+#         xx    yy    zz   xy  yz  yz
+box.simulation.deform(10000, timestep, strain, 0.3, reset=False, description=desc3) 
+
+
+# box.simulation.view("test_structure.in")
 # add mpi=7 argument to run with mpi
-# box.simulation.run(folder="small_test",)
-
+box.simulation.run(folder="comp_test")

@@ -282,20 +282,21 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data
         f = open(self.file_name, 'a')
         
         f.write(f"\n\
-#-----------------------------------------------------------------------------------\n\
-# EQUILIBRATION STAGE {self.equibs}                                                 \n")
+#---------------------------------------------------------------------------------------------------\n\
+# EQUILIBRATION STAGE {self.equibs}                                                                 \n")
                 
         if description != None:
             f.write("# Description: {description}\n")
 
         f.write("\
-#-----------------------------------------------------------------------------------\n\
+#---------------------------------------------------------------------------------------------------\n\
 ")
         if dynamics=='langevin':            
             if dump>0:
                 self.dumping = 1
                 f.write(f"\
-dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
+compute         1 all stress/atom NULL \n\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3] \n\
 \n\
 ")
             f.write(f"\
@@ -358,33 +359,39 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
             f.close()
 
-    def deform(self, steps, timestep, strain, temp, tdamp=None, pdamp=1000, drag=2.0, datafile=True, output_steps=100, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), description = None):
+    def deform(self, steps, timestep, strain, temp, final_temp=None, damp=None, datafile=True, output_steps=100, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), seed=random.randrange(0,99999), description = None):
         """
-        Carries out the deformation of the tyres. 
+        Carries out the deformation of the box. 
+        Note: strain MUST be a six-dimensional list/vector.
         """
         if not self.set_settings:
             self.equibs-=1
-            raise Exception("Settings have not yet been defined.")
+            raise Exception("Settings have not yet been defined.") 
+
+        if final_temp == None:
+            final_temp = temp
 
         f = open(self.file_name, 'a')
         f.write(f"\n\
-#-----------------------------------------------------------------------------------\n\
-# DEFORMATION STAGE                                                                 \n")
+#---------------------------------------------------------------------------------------------------------\n\
+# DEFORMATION STAGE                                                                                       \n")
         if description != None:
             self.lmp_sim_init += f"# Description: {description}\n"
 
         f.write("\
-#-----------------------------------------------------------------------------------\n\
+#---------------------------------------------------------------------------------------------------------\n\
 ")
         data_string = " ".join(data)
         
-        if tdamp==None:
-            tdamp=100*timestep
-
+        if damp==None:
+            damp=100*timestep
+        
         f.write(f"\
 run             0            \n\
-fix		1 all npt temp {temp} {temp} {tdamp} y 0 0 {pdamp} z 0 0 {pdamp} drag {drag}  \n\
-fix		2 all deform 1 x erate {strain} units box remap x                             \n\
+velocity        all create {float(temp)} 1231 \n\
+fix             1 all langevin {float(temp)} {float(final_temp)} {damp} {seed} \n\
+fix             2 all nve/limit {self.polylattice.lj_sigma}\n\
+fix		3 all deform 1 x trate {strain[0]} y trate {strain[1]} z trate {strain[2]} units box remap x \n\
 ")
         if datafile==True:
             self.data_production = 1
@@ -411,6 +418,7 @@ reset_timestep  0\n\
 run             {steps}                                \n\
 unfix 1                                                \n\
 unfix 2                                                \n\
+unfix 3                                                \n\
 ")
         if datafile == True:
             f.write(f"\

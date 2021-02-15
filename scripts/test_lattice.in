@@ -1,0 +1,102 @@
+#-----------------------------------------------------------------------------------
+# NANOPOLY - POLYMER NANOCOMPOSITE SIMULATION FILE                                  
+# Full project files can be found at: https://github.com/aravinthen/nanoPoly        
+#-----------------------------------------------------------------------------------
+# FILENAME: test_lattice.in                                                        
+# DATE: 2021-02-14                                                                     
+# OVERVIEW:                                                                         
+#    Number of polymer chains:     5                     
+#    Number of crosslinks:         5000           
+#    Nanostructure:                None                 
+#-----------------------------------------------------------------------------------
+                                                                                      
+variable structure index test_structure.in                                             
+variable simulation index test_lattice.in                                            
+                                                                                      
+# Initialization settings                                                             
+units              lj                                                                 
+boundary           p p p                                                              
+atom_style         bond                                                       
+log                log.${simulation}.txt                                            
+                                                                                      
+# read data from object into file                                                     
+read_data          ${structure}                                                     
+
+# define interactions                                                                 
+neighbor      0.4 bin                                                                 
+neigh_modify  every 10 one 10000                                                      
+comm_modify   mode single cutoff 1.9 vel yes                                      
+pair_style    lj/cut 1.5                                        
+pair_coeff    * * 0.05 0.3            
+bond_style    fene  
+special_bonds fene  
+bond_coeff    1 30.0 1.0 0.05 0.6 
+
+#---------------------------------------------------------------------------------------------------
+# EQUILIBRATION STAGE 1                                                                 
+# Description: {description}
+#---------------------------------------------------------------------------------------------------
+compute         1 all stress/atom NULL 
+dump            1 all cfg 100 dump.test_lattice.in_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3] 
+
+velocity        all create 0.05 1231 
+fix             1 all nve/limit 0.3
+fix             2 all langevin 0.05 0.1 10.0 86523
+thermo_style    custom step temp press 
+thermo          100
+run             5000 
+unfix 1         
+unfix 2         
+write_restart   restart.test_lattice.in.polylattice1
+
+#---------------------------------------------------------------------------------------------------
+# EQUILIBRATION STAGE 2                                                                 
+# Description: {description}
+#---------------------------------------------------------------------------------------------------
+velocity        all create 0.1 1231 
+fix             1 all nve/limit 0.3
+fix             2 all langevin 0.1 0.3 10.0 86523
+thermo_style    custom step temp press 
+thermo          100
+run             10000 
+unfix 1         
+unfix 2         
+write_restart   restart.test_lattice.in.polylattice2
+
+#---------------------------------------------------------------------------------------------------
+# EQUILIBRATION STAGE 3                                                                 
+# Description: {description}
+#---------------------------------------------------------------------------------------------------
+fix             1 all npt temp 0.3 0.3 1.0 iso 0 0 10.0 drag 2.0 
+fix             2 all momentum 1 linear 1 1 1
+thermo_style    custom step temp press 
+thermo          100
+run             10000 
+unfix 1         
+unfix 2         
+write_restart   restart.test_lattice.in.polylattice3
+
+#---------------------------------------------------------------------------------------------------------
+# DEFORMATION STAGE                                                                                       
+#---------------------------------------------------------------------------------------------------------
+run             0            
+velocity        all create 0.3 1231 
+fix             1 all langevin 0.3 0.3 1.0 52108 
+fix             2 all nve/limit 0.3
+fix		3 all deform 1 x trate 0.01 y trate 0.01 z trate 0 units box remap x 
+variable        var_step equal "step"              
+variable        var_temp equal "temp"              
+variable        var_lx equal "lx"              
+variable        var_ly equal "ly"              
+variable        var_lz equal "lz"              
+variable        var_pxx equal "pxx"              
+variable        var_pyy equal "pyy"              
+variable        var_pzz equal "pzz"              
+fix             datafile all print 100 "${var_step}	${var_temp}	${var_lx}	${var_ly}	${var_lz}	${var_pxx}	${var_pyy}	${var_pzz}" file test_lattice.in.deform.data title "step	temp	lx	ly	lz	pxx	pyy	pzz" screen no 
+thermo_style    custom step temp lx ly lz pxx pyy pzz                   
+thermo          100                         
+run             100000                                
+unfix 1                                                
+unfix 2                                                
+unfix 3                                                
+unfix datafile 

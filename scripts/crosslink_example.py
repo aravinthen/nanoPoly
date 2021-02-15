@@ -15,7 +15,7 @@ print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
 pair_sigma = 0.3 # lennard jones potential length, pair potential information
 pair_epsilon = 0.05
-box_size = 30.0
+box_size = 29.0
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 t1 = time.time()
@@ -28,8 +28,8 @@ types={1 : 1.0,
        3 : 1.0}
 
 # RANDOM WALKS ------------------------------------------------------------------------------
-nums = 900  # number of random walks
-size = 100 # size of the chain
+nums = 4  # number of random walks
+size = 25000 # size of the chain
 rw_kval = 30.0
 rw_cutoff = 1.0
 rw_epsilon = 0.05
@@ -55,7 +55,7 @@ print(f"Total time taken for random walk configuration: {total_time}")
 
 #  -----------------------------------------------------------------------------------
 
-num_links = 10000 # number of crosslinks
+num_links = 5000 # number of crosslinks
 mass = 3.0 # mass of crosslinker bead
 cl_kval = rw_kval
 cl_epsilon = rw_epsilon
@@ -71,7 +71,7 @@ crosslinks = box.bonded_crosslinks(num_links,
                                    cl_epsilon,
                                    cl_sigma,
                                    forbidden=[2],
-                                   selflinking=10)
+                                   selflinking=5)
 
 # box.unbonded_crosslinks(num_links,
 #                         mass,
@@ -86,6 +86,8 @@ crosslinks = box.bonded_crosslinks(num_links,
 
 t1 = time.time()
 print(f"Crosslinking concluded. Time taken: {t1 - t0}")
+
+# SIMULATION --------------------------------------------------------------------------------|
 
 timestep = 0.01
 t0 = time.time()
@@ -124,12 +126,12 @@ box.simulation.equilibrate(10000,
                            description=desc2,
                            reset=False)
 
-box.simulation.deform(100000, timestep, 1e-2, 0.3, reset=False, description=desc3) 
+strain = [1e-2, 1e-2, 0]
+box.simulation.deform(100000, timestep, strain, 0.3, reset=False, description=desc3)
 
 # box.analysis.error_check()
 
 box.simulation.structure("test_structure.in")
 
 # box.simulation.view("test_structure.in")
-
-# box.simulation.run(folder="stiff_test")
+box.simulation.run(folder="long_biax_test")
