@@ -515,6 +515,14 @@ class PolyLattice:
         self.types[bead_type] = mass
         # Flagging up the presence of unbonded crosslinks within the system
         self.cl_unbonded = True
+        # arguments: 
+        # 0: 
+        # 1: 
+        # 2: 
+        # 3: 
+        # 4: 
+        # 5: 
+        # 6: 
         self.cl_bonding = [bead_type, bond_type, allowed, bdist, ibonds, jbonds, prob]
 
         

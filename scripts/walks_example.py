@@ -64,9 +64,9 @@ desc1 = "Initialization"
 desc2 = "Equilibration"                                                                                
 desc3 = "Deformation procedure"    
 
-box.simulation.equilibrate(500,
+box.simulation.equilibrate(20000,
                            timestep,
-                           0.05,
+                           0.1,
                            'langevin',
                            final_temp=0.1,
                            bonding=False,
@@ -74,7 +74,7 @@ box.simulation.equilibrate(500,
                            reset=False,
                            dump=10)           
 
-box.simulation.equilibrate(1000,
+box.simulation.equilibrate(100000,
                            timestep,
                            0.1,
                            'langevin',
@@ -82,7 +82,7 @@ box.simulation.equilibrate(1000,
                            description=desc1,
                            reset=False)    
 
-box.simulation.equilibrate(1000,
+box.simulation.equilibrate(30000,
                            timestep,
                            0.3,
                            'nose_hoover',

@@ -1,4 +1,4 @@
-# Program Name: crosslink_example.py
+# Program Name:x crosslink_example.py
 # Author: Aravinthen Rajkumar
 # Description: nanopoly configuration that runs the 
 
@@ -10,11 +10,12 @@ from simulation import Simulation
 from poly import PolyLattice
 from analysis import Analysis
 
+
 print("NANOPOLY SIMULATION")
-pair_cutoff = 1.5
-pair_sigma = 0.3 # lennard jones potential length, pair potential information
-pair_epsilon = 0.05
-box_size = 29.0
+pair_cutoff = 3.0
+pair_sigma = 1.0 # lennard jones potential length, pair potential information
+pair_epsilon = 1.0
+box_size = 100.0
 t0 = time.time()    
 box = PolyLattice(box_size, pair_cutoff, pair_sigma, pair_epsilon)
 t1 = time.time()
@@ -27,12 +28,12 @@ types={1 : 1.0,
        3 : 1.0}
 
 # RANDOM WALKS ------------------------------------------------------------------------------
-nums = 4  # number of random walks
-size = 25000 # size of the chain
-rw_kval = 30.0
-rw_cutoff = 1.0
-rw_epsilon = 0.05
-rw_sigma = 0.4
+nums = 1  # number of random walks
+size = 10000 # size of the chain
+rw_cutoff = 5.0
+rw_kval = 150.0
+rw_epsilon = 1.0
+rw_sigma = 1.1
 
 total_time = 0
 for i in range(nums):
@@ -54,7 +55,7 @@ print(f"Total time taken for random walk configuration: {total_time}")
 
 #  -----------------------------------------------------------------------------------
 
-num_links = 5000 # number of crosslinks
+num_links = 1000 # number of crosslinks
 mass = 3.0 # mass of crosslinker bead
 cl_kval = rw_kval
 cl_epsilon = rw_epsilon
@@ -63,25 +64,25 @@ cl_cutoff = rw_cutoff
 t0 = t1 = 0
 t0 = time.time()
 
-crosslinks = box.bonded_crosslinks(num_links,
-                                   mass,
-                                   cl_kval,
-                                   cl_cutoff,
-                                   cl_epsilon,
-                                   cl_sigma,
-                                   forbidden=[2],
-                                   selflinking=5)
+# crosslinks = box.bonded_crosslinks(num_links,
+#                                    mass,
+#                                    cl_kval,
+#                                    cl_cutoff,
+#                                    cl_epsilon,
+#                                    cl_sigma,
+#                                    forbidden=[2],
+#                                    selflinking=5)
 
-# box.unbonded_crosslinks(num_links,
-#                         mass,
-#                         cl_kval,
-#                         cl_cutoff,
-#                         cl_epsilon,
-#                         cl_sigma,
-#                         allowed=None,
-#                         style='fene',
-#                         prob=0.8,
-#                         ibonds=2)
+box.unbonded_crosslinks(num_links,
+                        mass,
+                        cl_kval,
+                        cl_cutoff,
+                        cl_epsilon,
+                        cl_sigma,
+                        allowed=None,
+                        style='fene',
+                        prob=0.8,
+                        ibonds=2)
 
 t1 = time.time()
 print(f"Crosslinking concluded. Time taken: {t1 - t0}")
@@ -97,39 +98,40 @@ box.simulation.settings("test_lattice.in", comms=1.9)
 
 desc1 = "Initialization"
 desc2 = "Equilibration"
-desc3 = "Deformation procedure"    
+desc3 = "Deformation procedure"
 
-box.simulation.equilibrate(500,
+box.simulation.equilibrate(15000,
                            timestep,
-                           0.05,
+                           5.0,
                            'langevin',
-                           final_temp=0.1,
+                           final_temp= 30.0,
                            bonding=False,
                            description=desc1,
                            reset=False,
-                           dump=0)
+                           dump=100)
 
-box.simulation.equilibrate(1000,
+box.simulation.equilibrate(5000,
                            timestep,
-                           0.1,
+                           30.0,
                            'langevin',
-                           final_temp=0.3,
+                           bonding=True,
                            description=desc1,
                            reset=False)    
 
-box.simulation.equilibrate(1000,
-                           timestep,
-                           0.3,
-                           'nose_hoover',
-                           description=desc2,
-                           reset=False)
+# box.simulation.equilibrate(30000,
+#                            timestep,
+#                            0.8,
+#                            'nose_hoover',
+#                            final_temp=0.5,
+#                            description=desc2,
+#                            reset=False)
 
-strain = [1e-2, 1e-2, 0]
-box.simulation.deform(1000, timestep, strain, 0.3, reset=False, description=desc3)
+# strain = [1e-2, 0, 0]
+# box.simulation.deform(50000, timestep, strain, 0.5, reset=False, description=desc3)
 
 # box.analysis.error_check()
 
 box.simulation.structure("test_structure.in")
 
 # box.simulation.view("test_structure.in")
-box.simulation.run(folder="long_biax_test")
+box.simulation.run(folder="hot_box_test")

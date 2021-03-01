@@ -218,8 +218,9 @@ log                log.${{simulation}}.txt                                      
 # read data from object into file                                                     \n\
 ")
         if self.polylattice.cl_unbonded == True:
+# 
             f.write(f"\
-read_data          ${{structure}} extra/bond/per/atom {self.polylattice.cl_bonding[0]*2}   \n\
+read_data          ${{structure}} extra/special/per/atom 100 extra/bond/per/atom 100  \n\
 ")
         else:
             f.write(f"\
@@ -332,6 +333,14 @@ reset_timestep  0\n\
 run             {steps} \n\
 unfix 1         \n\
 unfix 2         \n\
+")
+            if bonding == True:
+                for i in range(1, len(self.polylattice.types)):
+                    f.write(f"\
+unfix {i+2} \n\
+")                    
+
+            f.write(f"\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
         if dynamics=='nose_hoover':
