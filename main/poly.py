@@ -18,7 +18,7 @@ import sys
 sys.path.append(".")
 
 from simulation import Simulation
-from analysis import Analysis
+from analysis import Check, Percolation
 
 class PolyLattice:
     """
@@ -36,7 +36,8 @@ class PolyLattice:
     """
     
     sim_attr = Simulation
-    ana_attr = Analysis
+    che_attr = Check
+    per_attr = Percolation
     
     class Cell:
         def __init__(self, index1, index2, index3, position, cellsides):            
@@ -100,7 +101,8 @@ class PolyLattice:
         
         self.nanostructure = None
         self.simulation = Simulation(self) # the simulation class
-        self.analysis = Analysis(self) # the analysis class
+        self.check = Check(self) # the Check subclass
+        self.percolation = Percolation(self) # the Percolation class
         
         # counts
         self.num_walks = 0
@@ -455,7 +457,8 @@ class PolyLattice:
                         print("b) a larger amount of lattice space,")
                         print("c) a smaller step distance.")
                         
-                # -------------------------------------------------------------------------------------------------------                        
+                # -----------------------------------------------------------------------------------
+                
             current_pos = trial_pos
             current_cell = self.which_cell(current_pos)                            
 
@@ -515,6 +518,7 @@ class PolyLattice:
         self.types[bead_type] = mass
         # Flagging up the presence of unbonded crosslinks within the system
         self.cl_unbonded = True
+        
         # arguments: 
         # 0: 
         # 1: 
@@ -522,7 +526,8 @@ class PolyLattice:
         # 3: 
         # 4: 
         # 5: 
-        # 6: 
+        # 6:
+        
         self.cl_bonding = [bead_type, bond_type, allowed, bdist, ibonds, jbonds, prob]
 
         

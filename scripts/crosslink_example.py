@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, '../main')
 from simulation import Simulation
 from poly import PolyLattice
-from analysis import Analysis
+from analysis import Check, Percolation
 
 print("NANOPOLY SIMULATION")
 pair_cutoff = 1.5
@@ -127,7 +127,7 @@ box.simulation.equilibrate(1000,
 strain = [1e-2, 1e-2, 0]
 box.simulation.deform(1000, timestep, strain, 0.3, reset=False, description=desc3)
 
-# box.analysis.error_check()
+# box.Check.distance_check()
 
 box.simulation.structure("test_structure.in")
 
