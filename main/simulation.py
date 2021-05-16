@@ -19,7 +19,6 @@ class Simulation:
 
     def __init__(self, polylattice):
         self.polylattice = polylattice # connects the stonestop box together with polylattice
-
         # details for writing
         self.equibs = 0 # the number of equilibration procedures 
         
@@ -32,16 +31,44 @@ class Simulation:
         self.data_production = 0
 
         self.set_settings = False
+
+        # variable below is set True when the types dictionary has been ennumerated.
+
+    def global_bead_num(self, bead):
+        """
+        Returns a unique ID for a system based on it's walk coordinates.
+        
+        """
+        walk = str(bead[0])
+        if walk.isnumeric():
+            return self.polylattice.walkinfo[bead[0]-1]+bead[1]        
+        if walk[0:2] == "bc":
+            return self.polylattice.num_walk_beads + self.polylattice.bclinfo[int(bead[0][2::])-1]+bead[1]
+        if walk[0:2] == "uc":
+            return self.polylattice.num_walk_beads + self.polylattice.num_bclbeads + self.polylattice.uclinfo[int(bead[0][2::])-1]+bead[1]
+
         
     def structure(self, datafile=None):
         """
         This is where we dump all of the structural data from polylattice into the LAMMPS file.
         NOTE: this comes FIRST in the simulation's order of precedence!
-        """
+        """            
+        self.polylattice.structure_ready = True
+
+
+        # builds dictionaries for types
+        # the self.polylattice.types dictionary holds the string type and the mass.
+        # the numbered type dictionary holdes the number type and the string type.
+        numbered_string = ""
+        for i in self.polylattice.interactions.used_types:
+            numbered_string += f"# {self.polylattice.interactions.typekeys[i]} {i}\n"
+
         self.data_file = str(datafile) # this sets the data in the class so it can be reused.
         f = open(f"{self.data_file}", "w")
-
-        all_data = self.polylattice.walk_data() # where all the data is stored
+        
+        # separate the walks and the crosslinkers so they can be treated differently.
+        crosslinker_beads = self.polylattice.crosslink_data()
+        walk_beads = self.polylattice.walk_data()
         
         # write the initial 
         f.write(f"\
@@ -55,98 +82,104 @@ class Simulation:
 {self.polylattice.num_beads} atoms                                                             \n\
 {self.polylattice.num_bonds} bonds                                                             \n\
                                                                                                \n\
-{len(self.polylattice.types)} atom types                                            \n\
+{len(self.polylattice.interactions.used_types)} atom types                                      \n\
 {len(self.polylattice.bonds)} bond types                                            \n\
                                                                                     \n\
 0.0000 {self.polylattice.cellside*self.polylattice.cellnums:.4f} xlo xhi            \n\
 0.0000 {self.polylattice.cellside*self.polylattice.cellnums:.4f} ylo yhi            \n\
 0.0000 {self.polylattice.cellside*self.polylattice.cellnums:.4f} zlo zhi            \n\
                                                                                     \n\
+                                                                                    \n\
+# Types have been converted numerically as follows:                                 \n\
+{numbered_string}\
+                                                                                    \n\
 Masses                                                                              \n\
                                                                                     \n\
 ")
         # read in the mass data.
-        for i in self.polylattice.types:
-            f.write(f"{i}\t{self.polylattice.types[i]}\n")
-        f.write("\n\n")
+        for i in self.polylattice.interactions.used_types:
+            f.write(f"{self.polylattice.interactions.typekeys[i]}\t{self.polylattice.interactions.types[i]}\n")
+        f.write("\n")
 
-        # this is highly dependent on the bead type.
 
-        # now it's time to read in data.
         f.write("\
 Atoms                                                                               \n\
 \n")
-        cross_posn = []
-        for i in self.polylattice.crosslinks_loc:
-            bond1 = i[0][-1]
-            bond2 = i[-1][-1]
-            cross_posn.append(list(np.around(bond1, decimals=4)))
-            cross_posn.append(list(np.around(bond2, decimals=4)))
+        # --------------------------------------------------------------------------------------
+        # Hierarchy: 1. Random walk beads
+        #            2. Grafted chains
+        #            3. Bonded crosslinker beads
+        #            4. Unbonded crosslinker beads
+        #            5. Nanoparticles
+        #            Note that grafts are pretty much just random walks anyway, so they don't
+        #            need to be treated separately.
+        #            Bonded crosslinks are ranked higher than unbonded crosslinks automatically
+        # --------------------------------------------------------------------------------------
         
-        cross_vals = []
-        linknums = []
+        # READ ATOMS
+        for bead in walk_beads:
+            bead_num = self.polylattice.walkinfo[bead[0]-1]+bead[1]
+            bead_type = self.polylattice.interactions.typekeys[bead[2]] # converted beforehand
+            x, y, z = bead[-1][0], bead[-1][1], bead[-1][2]
+            f.write(f"\t{bead_num+1}\t{bead[0]}\t{bead_type}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
 
-        for i in range(len(all_data)):
-            atom_num = i+1
-            chain = all_data[i][0]
-            beadtype = all_data[i][2]            
-
-            #------------------ cross links -----------------------
-            cp = list(np.around(all_data[i][-1],decimals=4))
-            if cp in cross_posn:
-                cross_vals.append([list(np.around(all_data[i][-1], decimals=4)), atom_num])
-
-            # note that num_walks is nothing more than the number of chains
-            # as initial value is 0, the actual value of the chain 
-            if chain == self.polylattice.num_walks:
-                linknums.append([list(np.around(all_data[i][-1], decimals=4)), atom_num])
-            #------------------------------------------------------
-                
-
-            x, y, z = all_data[i][-1][0], all_data[i][-1][1], all_data[i][-1][2]
-            f.write(f"\t{atom_num}\t{chain}\t{beadtype}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
             
-        
+        for bead in crosslinker_beads:            
+            walk_coordinate = int(bead[0][2::])
+            if bead[0][0:2] == "bc":
+                addon = self.polylattice.num_walks
+                walk = walk_coordinate + addon
+                
+            if bead[0][0:2] == "uc":
+                addon = (self.polylattice.num_walks+self.polylattice.num_bclstructs)
+                walk = walk_coordinate + addon
+                
+            bead_num = self.global_bead_num(bead)                
+            bead_type = self.polylattice.interactions.typekeys[bead[2]] # converted beforehand
+            x, y, z = bead[-1][0], bead[-1][1], bead[-1][2]
+            f.write(f"\t{bead_num+1}\t{walk}\t{bead_type}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
+
+        # BOND DATA            
         # reading in the bond data        
         f.write("\
 Bonds                                                                               \n\
                                                                                     \n")
-        
-        bond = 0
-        atom_num = 1
-        for walk in self.polylattice.walkinfo:
-            for bead in range(1,walk[1]):
-                # writing the bond
-                atom_num += 1
-                bond += 1
-                bondtype = all_data[atom_num-1][4]
-                f.write(f"\t{bond}\t{bondtype}\t{(atom_num-1)}\t{atom_num}\n")
-            atom_num+=1
+        # READ BOND DATA: RANDOM WALKS
+        bond = 1
+        for walk in range(self.polylattice.num_walks+1):
+            for bead in self.polylattice.walk_data(walk)[1::]:
+                bead_num = self.global_bead_num(bead)
+                bondtype = bead[3]                                
+                f.write(f"\t{bond}\t{bondtype}\t{(bead_num)}\t{bead_num+1}\n")
+                bond+=1
 
-        # crosslinker bonds next. This is slightly more complicated.
-#        print(cross_vals)        
-        for i in self.polylattice.crosslinks_loc:
-            # conversion to lists is due to the difficulties in truth values for arrays
-            # it is very hard to evaluate two arrays as equal due to floating point error
-            bond1 = list(np.around(i[0][-1], decimals=4))
-            clinker = list(np.around(i[1][-1], decimals=4))
-            bond2 = list(np.around(i[2][-1], decimals=4))
-            bondtype = i[1][4]
+        # READ BOND DATA: GRAFTS
+        for graft in self.polylattice.graft_coords:
+            beadnum1 = self.global_bead_num(graft[0])+1
+            beadnum2 = self.global_bead_num(graft[1])+1
 
-
-            bond1_num = [dat[1] for dat in cross_vals if dat[0]==bond1][0]
-            clinker_num = [dat[1] for dat in linknums if dat[0]==clinker][0]
-            bond2_num = [dat[1] for dat in cross_vals if dat[0]==bond2][0]
-            
-            f.write(f"\t{bond}\t{bondtype}\t{bond1_num}\t{clinker_num}\n")
-            bond+=1
-            f.write(f"\t{bond}\t{bondtype}\t{clinker_num}\t{bond2_num}\n")
+            # returns the bond detail attached to the first bead of the grafted chain
+            bondtype = self.polylattice.walk_data(graft[1][0])[graft[1][1]][3]
+            f.write(f"\t{bond}\t{bondtype}\t{(beadnum1)}\t{beadnum2}\n")
             bond+=1
             
+        # READ BOND DATA: CROSSLINKS
+        for crosslink in self.polylattice.crosslinks_loc:
+            beadnum1 = self.global_bead_num(crosslink[0])+1
+            beadnum2 = self.global_bead_num(crosslink[2])+1
+            linkernum = self.global_bead_num(crosslink[1])+1
+            bondtype = crosslink[1][3]
+            
+            f.write(f"\t{bond}\t{bondtype}\t{(beadnum1)}\t{linkernum}\n")
+            bond+=1
+            f.write(f"\t{bond}\t{bondtype}\t{linkernum}\t{beadnum2}\n")
+            bond+=1
+
         f.close()
 
-        
-    def settings(self, filename=None, dielectric=False, comms=None):
+#-----------------------------------------------------------------------------------------------------
+
+    def settings(self, filename=None, dielectric=False):
         """ 
         NOTE: This comes SECOND in the simulation order of precedence!
               Will flag an error if sim_structure hasn't run first.
@@ -155,11 +188,9 @@ Bonds                                                                           
                     dielectric: whether the material is dielectric or not.
                                 WARNING! needs a bit of confirmation.
         """
+        if self.polylattice.structure_ready == False:
+            raise EnvironmentError("You must create a structure file before settings can be defined.")
         
-        
-        if comms == None:
-            comms = 2*self.polylattice.lj_sigma
-
         def dictionary_shuffle(my_dict, key_of_list):
             """
             Sorts a dictionary of lists by one of the indices shared in the list.
@@ -201,9 +232,11 @@ Bonds                                                                           
 # FILENAME: {self.file_name}                                                        \n\
 # DATE: {today}                                                                     \n\
 # OVERVIEW:                                                                         \n\
-#    Number of polymer chains:     {self.polylattice.num_walks}                     \n\
-#    Number of crosslinks:         {len(self.polylattice.crosslinks_loc)}           \n\
-#    Nanostructure:                {self.polylattice.nanostructure}                 \n\
+#    Number of polymer chains:       {self.polylattice.num_walks}                   \n\
+#    Number of bonded crosslinks:    {self.polylattice.num_bclbeads}                \n\
+#    Number of unbonded crosslinks:  {self.polylattice.num_uclbeads}                \n\
+#    Number of grafted chains:       {self.polylattice.num_grafts}                  \n\
+#    Nanostructure:                  {self.polylattice.nanostructure}               \n\
 #-----------------------------------------------------------------------------------\n\
                                                                                       \n\
 variable structure index {self.data_file}                                             \n\
@@ -229,12 +262,29 @@ read_data          ${{structure}}                                               
                                                    
         f.write(f"\n\
 # define interactions                                                                 \n\
-neighbor      0.4 bin                                                                 \n\
+neighbor      0.4 multi                                                               \n\
 neigh_modify  every 10 one 10000                                                      \n\
-comm_modify   mode single cutoff {comms} vel yes                                      \n\
-pair_style    lj/cut {self.polylattice.lj_cut}                                        \n\
-pair_coeff    * * {self.polylattice.lj_energy} {self.polylattice.lj_sigma}            \n\
 ")
+
+        # add pair interactions of different beads
+        for i in range(np.shape(self.polylattice.interactions.type_matrix)[0]):
+            for j in range(i, np.shape(self.polylattice.interactions.type_matrix)[0]):
+                typestring = self.polylattice.interactions.type_matrix[i,j]
+                type1, type2 = typestring.split(",")
+                num1 = self.polylattice.interactions.typekeys[type1]
+                num2 = self.polylattice.interactions.typekeys[type2]
+                
+                energy = self.polylattice.interactions.return_energy(type1, type2)
+                sigma = self.polylattice.interactions.return_sigma(type1, type2)
+                cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
+                
+                f.write(f"\
+pair_style    lj/cut {cutoff}                                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
+")
+
+        f.write("\n")
+        
         # now it's time to read in the bond information.
         styles_dict = dictionary_shuffle(self.polylattice.bonds, -1)        
         for style in styles_dict:
@@ -245,7 +295,7 @@ bond_style    {style}  \n")
 special_bonds fene  \n")
             for data in styles_dict[style]:
                 f.write(f"\
-bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {data[1][1]} {data[1][2]} {data[1][3]} \n")
+bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {np.around(data[1][1],decimals=5)} {np.around(data[1][2], decimals=5)} {np.around(data[1][3],decimals=5)} \n")
                 
         # ensures that the settings have been set.
         # this must be true for equilibration to take place.
@@ -302,7 +352,7 @@ dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs 
 ")
             f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
-fix             1 all nve/limit {self.polylattice.lj_sigma}\n\
+fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
 ")
             if bonding == True:
@@ -312,13 +362,15 @@ fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n
                     b_data = self.polylattice.cl_bonding
                     # jparam : the allowed beads
                     for jparam in b_data[2]:
+                        type1 = self.polylattice.interactions.typekeys[jparam]
+                        type2 = self.polylattice.interactions.typekeys[b_data[0]]
                         if b_data[6] == None:
                             f.write(f"\
-fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} iparam {b_data[4]} {b_data[0]} jparam {b_data[5]+2} {jparam} \n\
+fix             {type1+2} all bond/create 1 {type2} {type1} {b_data[3]} {b_data[1]} iparam {b_data[4]} {type2} jparam {b_data[5]+2} {type1} \n\
 ")
                         else:
                             f.write(f"\
-fix             {jparam+2} all bond/create 1 {b_data[0]}  {jparam} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} {b_data[0]} jparam {b_data[5]+2} {jparam}\n\
+fix             {type1+2} all bond/create 1 {type2} {type1} {b_data[3]} {b_data[1]} prob {b_data[6]} {seed} iparam {b_data[4]} {type2} jparam {b_data[5]+2} {type1}\n\
 ") 
             
             f.write(f"\
@@ -335,7 +387,7 @@ unfix 1         \n\
 unfix 2         \n\
 ")
             if bonding == True:
-                for i in range(1, len(self.polylattice.types)):
+                for i in range(1, self.polylattice.interactions.num_types):
                     f.write(f"\
 unfix {i+2} \n\
 ")                    
@@ -474,7 +526,8 @@ unfix datafile \n\
             os.system(f"cp {self.file_name} {folder}")
             os.system(f"cp {self.data_file} {folder}")
 
-    def view(self, sim_file):
-        bashcommand = f"ovito {sim_file}"
+    def view(self, view_path, sim_file):
+        bashcommand = f"{view_path} {sim_file}"
+
         os.system(bashcommand)
         

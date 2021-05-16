@@ -1,10 +1,7 @@
-# Program Name: walks_example.py
+# Program Name: graft_example.py
 # Author: Aravinthen Rajkumar
-# Description: nanopoly configuration that just runs the random walks
+# Description: test of the chain grafting mechanism
 
-# Program Name: polylattice_testing.py
-# Author: Aravinthen Rajkumar
-# Description: The actual use of the polylattice program will be confined to this file.
 
 import numpy as np
 import time
@@ -13,61 +10,73 @@ import sys
 sys.path.insert(0, '../main')
 from simulation import Simulation
 from poly import PolyLattice
+from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 25.0
+box_size = 10.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=83)
+box = PolyLattice(box_size, cellnums=10)
 t1 = time.time()
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
 # Atom interactions
 # TYPES
 box.interactions.newType("a", 0.5,
-                         (0.1, 2, 1))
+                         (0.2, 2,1))
 
 box.interactions.newType("b", 1.0,
-                         (0.2,3,1),
-                         ('a,b', (0.1, 4,2)))
+                         (0.3,3,1),
+                         ('a,b', (0.3,4,2)))
 
-box.interactions.newType("c", 3.0, (0.25,3,1),
-                         ('c,a', (0.19,4,2)),
-                         ('c,b', (0.19,4,2)))
+box.interactions.newType("c", 1.0,
+                         (0.2, 3,1),
+                         ('c,a', (0.2,4,2)),
+                         ('c,b', (0.2,4,2)))
+
+box.interactions.newType("d", 1.0,
+                         (0.2, 3,1),
+                         ('d,a', (0.1,4,2)),
+                         ('d,b', (0.15,4,2)),
+                         ('d,c', (0.2,4,2)))
 
 # following values determine the bonding of the random walks
-num_walks = 5
-size = 1000 # size of the chain
+size = 100 # size of the chain
 rw_kval = 30.0
 rw_cutoff = 3.5
 rw_epsilon = 0.05
 rw_sigma = 0.3
-
-
-block = 200
-copolymer = []
-for i in range(block):
-    copolymer.append('a')
-for i in range(block):
-    copolymer.append('b')
-
-random_copolymer = []
+graft_spacing = 20
+graft_size = 10
+graft_num = 4
 
 total_time = 0
-for i in range(num_walks):
-    t0 = time.time()
-    box.random_walk(size,
-                    rw_kval,
-                    rw_cutoff,
-                    rw_epsilon,
-                    rw_sigma,
-                    bead_sequence = copolymer,
-                    termination="retract")
-    t1 = time.time()
-    total_time+= t1-t0
-    print(f"Walk {i} completed in {t1-t0} seconds. Total time elapsed: {total_time}")
+t0 = time.time()
 
+box.random_walk(size,
+                rw_kval,
+                rw_cutoff,
+                rw_epsilon,
+                rw_sigma,
+                bead_sequence = ['a','b'],
+                starting_pos = [5.0, 5.0, 5.0],
+                termination="retract")
+print("Random walk completed.")
+
+for i in range(1, size, graft_spacing):
+    for j in range(graft_num):
+        box.graft_chain([1, i],
+                        graft_size,
+                        rw_kval,
+                        rw_cutoff,
+                        rw_epsilon,
+                        rw_sigma,
+                        bead_sequence=['c','d'])
+    print(f"Graft {i} completed.")
+
+
+t1 = time.time()
 total_time+= t1-t0
-print(f"Walks complete. Total time: {total_time} seconds")
+print(f"Walk completed in {t1-t0} seconds")
 
 # box.random_walk(size,
 #                 rw_kval,
@@ -95,6 +104,7 @@ strain = [-1e-2, -1e-2, -1e-2]
 #         xx    yy    zz   xy  yz  yz
 # box.simulation.deform(10000, timestep, strain, 0.3, reset=False, description=desc3)
 box.simulation.structure("test_structure.in")
+box.simulation.settings("test_settings.in")
 
 view_path = "~/ovito/build/bin/ovito"
 box.simulation.view(view_path, "test_structure.in")

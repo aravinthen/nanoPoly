@@ -6,9 +6,6 @@
 **** Potential methods
      *The Irving-Kirkwood Formalism*     
 ** Potential Structures
-*** Epoxy resins
-    Resins are examples of polymeric matter that are formed by the crosslinking of short chains with reactive endpoints.
-    These chains are mixed with *hardeners*, molecules that possess four functional groups that match with the reactive endpoints.
 ** Bugs
 *** DONE BUG: undetected beads that are too close
 - Defining features of the bug:

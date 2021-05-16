@@ -1,5 +1,5 @@
 # Program Name: polylattice.py
-# Author: inthen Rajkumar
+# Author: Aravinthen Rajkumar
 # Description: Contains all the code necessary for the following tasks:
 #              1. Generating empty lattices for random-walks
 #              2. Populating lattices with polymeric random walks.
@@ -58,8 +58,140 @@ class PolyLattice:
             self.cl_pos = None
             # multiple beads allowed in a cell.
             self.beads = []
+
+    class Interactions:
+        """All the interactions between beads are stored here."""
+        def __init__(self):
+            self.types = {}
+            self.typekeys = {}
+            self.type_matrix = None
+            self.sigma_matrix = None   # distances between types
+            self.energy_matrix = None  # interaction energies between types
+            self.cutoff_matrix = None  # cutoff between types
+            self.used_types = []        # the types that are actually used in the simulation
+
+            self.num_types = 0 # the number of types present in the box
+
+        def newType(self, type_id, mass, potential, *args):
+            """
+            type_name: the id of the new type
+            potential: TUPLE, three numbers.
+            """
+            if not type_id.isalnum():
+                raise TypeError("Names must be composed of only alphanumeric characters.")
             
-    def __init__(self, boxsize, cutoff, sigma, epsilon):
+            if self.num_types == 0:
+                if len(args) > 0:
+                    raise TypeError("No other types have been defined in the system.")
+                self.types[type_id] = mass
+                self.typekeys[type_id] = self.num_types+1
+                self.type_matrix = np.array([f"{type_id},{type_id}"])
+                
+                self.sigma_matrix = np.array([potential[0]])
+                self.energy_matrix = np.array([potential[1]])
+                self.cutoff_matrix = np.array([potential[2]])
+                self.num_types+=1                
+            else:
+                self.types[type_id] = mass
+                self.typekeys[type_id] = self.num_types+1
+                self.num_types+=1
+        
+                # modify the type matrix
+                type_matrix = np.empty((self.num_types,self.num_types), dtype=np.dtype('U50'))
+
+                # list of types
+                types_list = [i for i in self.types]
+                # type connections are built in                
+                for i in range(self.num_types):
+                    for j in range(self.num_types):
+                        type_matrix[i,j] = f'{types_list[i]},{types_list[j]}'
+
+                self.type_matrix = type_matrix
+                            
+                # modify the sigma matrix
+                sigma_matrix = self.sigma_matrix
+                ##  build new columns and rows onto the energy matrix
+                sigma_matrix = np.column_stack((sigma_matrix,
+                                                np.array([0 for i in range(self.num_types-1)])))
+                sigma_matrix = np.vstack((sigma_matrix,
+                                          np.array([0 for i in range(self.num_types)])))
+                # assign sigma
+                sigma_matrix[self.num_types-1,self.num_types-1] = potential[0]
+                
+                self.sigma_matrix = sigma_matrix
+                
+                # modify the energy matrix
+                energy_matrix = self.energy_matrix                
+                ##  build new columns and rows onto the energy matrix
+                energy_matrix = np.column_stack((energy_matrix,
+                                                np.array([0 for i in range(self.num_types-1)])))
+                energy_matrix = np.vstack((energy_matrix,
+                                          np.array([0 for i in range(self.num_types)])))                
+                # assign energy
+                energy_matrix[self.num_types-1,self.num_types-1] = potential[1]
+                
+                self.energy_matrix = energy_matrix
+                
+                # modify the cutoff matrix
+                cutoff_matrix = self.cutoff_matrix
+                ##  build new columns and rows onto the energy matrix
+                cutoff_matrix = np.column_stack((cutoff_matrix,
+                                                np.array([0 for i in range(self.num_types-1)])))
+                cutoff_matrix = np.vstack((cutoff_matrix,
+                                          np.array([0 for i in range(self.num_types)])))
+                # assign cutoff 
+                cutoff_matrix[self.num_types-1,self.num_types-1] = potential[2]                
+                self.cutoff_matrix = cutoff_matrix
+                
+                #----------------------------------------------------------------------------------
+                # now deal with the interactions for different kinds of beads
+                for i in args:
+                    name = i[0].replace(" ","")
+
+                    # reverse name has to be broke part, reversed, then joined.
+                    revname = i[0].replace(" ","")
+                    revname = revname.split(",")
+                    revname = ",".join(revname[::-1])
+                    properties = i[1]
+                    
+                    if name not in self.type_matrix or revname not in self.type_matrix:
+                        raise TypeError("Type combination does not exist in system.")
+
+                    if type_id not in name:
+                        raise TypeError("Unrelated type interaction defined. Interactions must always contain the new type..")
+                    
+                    ni, nj = np.where(self.type_matrix == name)
+                    ri, rj = np.where(self.type_matrix == revname)
+
+                    # now with the array indices, simply slot everything into place.
+                    self.sigma_matrix[ri[0], rj[0]] = properties[0]
+                    self.sigma_matrix[ni[0], nj[0]] = properties[0]
+                    
+                    self.energy_matrix[ri[0], rj[0]] = properties[1]
+                    self.energy_matrix[ni[0], nj[0]] = properties[1]
+
+                    self.cutoff_matrix[ri[0], rj[0]] = properties[2]
+                    self.cutoff_matrix[ni[0], nj[0]] = properties[2]
+
+        def return_sigma(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.sigma_matrix[ni,nj][0]
+
+        def return_energy(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.energy_matrix[ni,nj][0]
+        
+        def return_cutoff(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.cutoff_matrix[ni,nj][0]
+
+    def __init__(self, boxsize, cellnums=1.0):
         """        
         cellside: Length of the side of a cells
         cellnums: Number of cells in one-dimension.
@@ -67,50 +199,70 @@ class PolyLattice:
         epsilon: lennard jones energy
         celltotal: total number of cells in lattice.
         """
-        self.boxsize = boxsize # NOT GUARANTEED!!!!
+        self.boxsize = boxsize # NOT GUARANTEED!!!!        
+        self.cellnums = cellnums # the lj distance between two 
+        self.cellside = self.boxsize/self.cellnums
+        self.celltotal = self.cellnums**3
         
-        self.lj_sigma = sigma # the lj distance between two atoms
-        self.lj_cut = cutoff
-        self.lj_energy = epsilon
         self.crossings = np.zeros((3, 1)) # number of crossings in each direction, [x, y, z]
                                           # encapsulates boundary conditions
 
-        self.cellside = round(1.01*self.lj_sigma, 16)
-        self.cellnums = m.ceil(self.boxsize/self.cellside)
-        self.celltotal = self.cellnums**3
-        
+
+        # initializing the interactions class
+        self.interactions = self.Interactions()
+
+        # attached libraries
+        self.simulation = Simulation(self) # the simulation class
+        self.check = Check(self) # the Check subclass
+        self.percolation = Percolation(self) # the Percolation class        
         # bond details
         self.bonds = None # 
-        
+
         # crosslink details
-        self.crosslink_id = None # this is the "CHAIN" for the crosslinks
         self.crosslinks_loc = []
         # unbonded crosslinks
         self.cl_unbonded = False # Will be set to true once unbonded crosslinks are added
         self.cl_bonding = None # saves the bond configuration for use in the simulation file
-
-        # bead types and masses
-        self.types = None # this is meant to be a dictionary
-                          # format: "type": mass
-                          # "type" is numerical
         
         self.random_walked = False
-        self.walkinfo = [] # this is supposed to store the walk as well as the number of
-                            # beads in that walk.
-                            # used to control the bond writing process in the simulation class
+        # note: For info dictionaries the starting values all begin at zero.
+        #       This is so that the beads are given the correct values for atom number in the
+        #       simulation directory.
+        
+        self.walkinfo = {0:0}  # this is supposed to store the walk as well as the number of
+                               # beads in that walk.
+                               # used to control the bond writing process in the simulation class
+        self.uclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
+        self.bclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
+
         
         self.nanostructure = None
-        self.simulation = Simulation(self) # the simulation class
-        self.check = Check(self) # the Check subclass
-        self.percolation = Percolation(self) # the Percolation class
         
         # counts
-        self.num_walks = 0
-        self.num_bonds = 0
-        self.num_beads = 0
+        self.num_uclstructs = 0 # the number of unbonded crosslink structures
+        self.num_uclbeads = 0
+        
+        self.num_bclstructs = 0 # the number of bonded crosslink structures present
+        self.num_bclbeads = 0 
 
+        self.num_walks = 0
+        self.num_walk_beads = 0
+        
+        self.num_grafts = 0
+        self.graft_beads = 0
+        self.graft_coords = [] # Contains the coordinates of the bead the graft is attached to,
+                               # as well as the first bead on that grafted chain. This is ONLY
+                               # used to build the relevant bond!
+
+        # global counts
+        self.num_bonds = 0        
+        self.num_beads = 0
+    
         # this bit of code builds the cells within the lattice.
         self.Cells = []
+
+        # when the simulation library is called, the structure is considered complete.
+        self.structure_ready = False
         
         # for i in range(self.cellnums):
         #     for j in range(self.cellnums):
@@ -143,7 +295,7 @@ class PolyLattice:
     # ... a bunch more. Oh boy, we need to update this...
     
     # LATTICE METHODS ---------------------------------------------------------
-
+    
     def index(self, cell_list):
         """
         USE THIS TO ACCESS THE CELLS IN THE LATTICE!
@@ -184,8 +336,8 @@ class PolyLattice:
                          (cell_index[2]+k)%self.cellnums] for i in range(-1,2) for j in range(-1,2) for k in range(-1,2))
 
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
-
-    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, mini=1.12234, style='fene', phi=None, theta=None, bead_types=None, cell_num=None, termination=None, allowed_failures=10000):
+    
+    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, starting_pos=None, restart=False, termination=None, allowed_failures=10000):
         """
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -208,13 +360,13 @@ class PolyLattice:
         Notes: Nested functions prevent the helper functions from being used outside of scope.       
         """
 
+        if self.structure_ready == True:
+            raise EnvironmentError("Structures cannot be built or modified when simulation procedures are in place.")
+        
         ID = self.num_walks + 1
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
-        if sigma < self.lj_sigma:
-            print("You cannot set the bond length to be less than the pair potential")
-            print("length. Either modify the bond length or increase the pair")
-            print("potential length in the PolyLattice box.")
+
         
         def rand_distance(length, dimension):
             """
@@ -272,18 +424,6 @@ class PolyLattice:
                 
             return new_pos        
 
-
-        # bead type dictionary
-        if bead_types == None:            
-            bead_types[1] = 1.0
-        else:
-            for i in bead_types:
-                if not str(i).isdigit():
-                    raise TypeError("Bead types must be integers.")
-            bead_types = bead_types
-
-        self.types = bead_types
-
         # bond type dictionary
         if self.bonds == None:
             self.bonds = {}
@@ -300,32 +440,17 @@ class PolyLattice:
                 self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
                 
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
-        
-        if cell_num == None:            
-            current_cell = np.array([random.randrange(0, self.cellnums),
-                                      random.randrange(0, self.cellnums),
-                                      random.randrange(0, self.cellnums)])
 
-        else:
-            current_cell = np.array(cell_num)
 
-        cell_pos = self.index(current_cell).position
-        cell_bound = cell_pos + self.cellside
-        
-        # Initial values of the random walk
-        bead_number = 0
+        # put the types of being used in the random walk into the used types set
+        for i in bead_sequence:
+            if i not in self.interactions.used_types:
+                self.interactions.used_types.append(i)
 
-        # trial for the initial position
-        invalid_start = True
-        total_failure = False
-        failure = 0
-        while invalid_start:
-            current_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
-                                    random.uniform(cell_pos[1], cell_bound[1]),
-                                    random.uniform(cell_pos[2], cell_bound[2])])                    
-            index_c = self.which_cell(current_pos)                    
-            neighbours = self.check_surroundings(current_pos)
-            
+        if starting_pos != None:
+            starting_pos = np.array(starting_pos)
+            index_c = self.which_cell(starting_pos)                    
+            neighbours = self.check_surroundings(starting_pos)
             issues = 0
             for j in neighbours:
                 index_n = self.which_cell(j[-1])
@@ -334,48 +459,121 @@ class PolyLattice:
                     real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
                 else:
                     real_j = j[-1]
-                
-                if (np.linalg.norm(current_pos - real_j) < self.lj_sigma):
+
+                # check the sigma distance
+                # the lhs is the distance between the bead and the neighbour
+                distance = np.linalg.norm(starting_pos - real_j)
+                if distance < self.interactions.return_sigma(bead_sequence[0], j[2]):
                     issues+=1
                     break # stop checking neighbours
-
-            if issues > 0:
-                invalid_start = True
-                failure+=1
-                if failure > allowed_failures:
-                    total_failure = True
-                    invalid_start = False
+                
+            if issues>0:
+                print("Provided starting position is too close to another bead.")
+                print("Please choose a more appropriate position.")
+                raise Exception("Program terminated.")
 
             else:
-                invalid_start = False
-                failure = 0        
+                bead_data = [ID,
+                             0,
+                             bead_sequence[0],
+                             bond_type,
+                             self.num_beads,
+                             starting_pos]
+                
+                self.num_beads+=1
+                self.num_walk_beads += 1 # the individual count for the number of beads specific to a walk
+                self.index(self.which_cell(starting_pos)).beads.append(bead_data)
 
-        if total_failure == True:
-            print("\nThe number of permitted failures for the starting position have")
-            print("exceeded the set value. The box is too dense for valid position to")
-            print("be found.")
-            print("It is recommended to run the algorithm in a less packed box.")
-            raise Exception("Program terminated.")
+        else:
+            if cell_num != None:
+                current_cell = np.array(cell_num)
+            else:
+                current_cell = np.array([random.randrange(0, self.cellnums),
+                                         random.randrange(0, self.cellnums),
+                                         random.randrange(0, self.cellnums)])
+                
+            
 
-        # The full data entry for keeping track of the bead.
-        bead_data = [ID,
-                     bead_number,
-                     1,
-                     bead_types[1],
-                     bond_type,
-                     self.num_beads,
-                     current_pos]
+            cell_pos = self.index(current_cell).position
+            cell_bound = cell_pos + self.cellside
+            
+            # trial for the initial position
+            invalid_start = True
+            total_failure = False
+            failure = 0
+            while invalid_start:            
+                starting_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
+                                        random.uniform(cell_pos[1], cell_bound[1]),
+                                        random.uniform(cell_pos[2], cell_bound[2])])                    
+                index_c = self.which_cell(starting_pos)                    
+                neighbours = self.check_surroundings(starting_pos)
+            
+                issues = 0
+                
+                for j in neighbours:
+                    index_n = self.which_cell(j[-1])
+                    if self.cellnums-1 in np.abs(index_c - index_n):
+                        period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                        real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                    else:
+                        real_j = j[-1]
 
-        self.num_beads+=1
-        self.index(current_cell).beads.append(bead_data)
+                    # check the sigma distance
+                    # the lhs is the distance between the bead and the neighbour
+                    distance = np.linalg.norm(starting_pos - real_j)
+                    if distance < self.interactions.return_sigma(bead_sequence[0], j[2]):
+                        issues+=1
+                        break # stop checking neighbours
+
+                if issues > 0:                    
+                    invalid_start = True
+                    failure+=1
+                    
+                    if failure > allowed_failures:
+                        if restart == True:
+                            print(f"Failure tolerance reached at random walk {self.num_walks}.")
+                            print("Restarting the walk is recommended.")
+                            total_failure = False
+                            failure = 0
+                            issues = 0
+                        else:
+                            total_failure = True
+                            invalid_start = False
+
+                else:
+                    invalid_start = False
+                    failure = 0        
+
+                if total_failure == True:
+                    print("\nThe number of permitted failures for the starting position have")
+                    print("exceeded the set value. The box is too dense for valid position to")
+                    print("be found.")
+                    print("It is recommended to run the algorithm in a less packed box.")
+                    raise Exception("Program terminated.")
+
+                # The full data entry for keeping track of the bead.
+                bead_data = [ID,
+                             0,
+                             bead_sequence[0],
+                             bond_type,
+                             self.num_beads,
+                             starting_pos]
+
+                self.num_beads+=1
+                self.num_walk_beads += 1 # the individual count for the number of beads specific to a walk
+                self.index(current_cell).beads.append(bead_data)
         
         # Begin loop here.
+        bead_number = 1
         bond = mini*sigma # the minimum of the LJ potential
         i = 1
+        current_pos = starting_pos
+        
         while i < numbeads:            
             too_close = True # used to check if the cell is too close
             generation_count = 0 # this counts the number of random vectors generated.
                                  # used to raise error messages.
+            bead_type = bead_sequence[(i % len(bead_sequence))]
             while too_close:
                 # loop works like this:
                 #    0. generates trial position
@@ -405,10 +603,12 @@ class PolyLattice:
                         real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
                     else:
                         real_j = j[-1]                                            
-                        
-                    if round(np.linalg.norm(current_pos - real_j), 5) < self.lj_sigma:
+
+                    distance = round(np.linalg.norm(current_pos - real_j), 5)
+                    sigma = self.interactions.return_sigma(bead_type, j[2])
+                    if distance < sigma:                        
                         issues += 1
-                        break 
+                        break
 
                 if issues > 0:      
                     too_close = True
@@ -428,13 +628,23 @@ class PolyLattice:
                         self.num_walks += 1
                         print(f"Breaking random walk! There are now {self.num_walks} chains in the system.")
                         print(f"New chain length: {new_numbeads}")
-                        self.random_walk(new_numbeads, Kval, cutoff, energy, sigma, mini=mini, style=style, bead_types=bead_types, termination=True)                    
+                        self.random_walk(new_numbeads,
+                                         Kval,
+                                         cutoff,
+                                         energy,
+                                         sigma,
+                                         mini=mini,
+                                         style=style,
+                                         bead_sequence=bead_sequence,
+                                         restart=restart,
+                                         termination=termination)                    
                         return 0
                     
                     elif termination == "retract":
                         print(f"Retracting at bead {i} of random walk {ID}")                        
                         # adjust walk positions                        
                         i = i - 1
+                        self.num_beads -= 1
                         
                         progress = self.walk_data(ID)
                         bad_bead = progress[-1]
@@ -460,16 +670,31 @@ class PolyLattice:
                 # -----------------------------------------------------------------------------------
                 
             current_pos = trial_pos
-            current_cell = self.which_cell(current_pos)                            
+            current_cell = self.which_cell(current_pos)
+
+
+            # 0: random walk this belongs to
+            # 1: number of the bead (on the random walk)
+            # 2: bead type
+            # 3: bead mass
+            # 4: bond type (number)
+            # 5: number of beads within structure
+            # 6: grafting
+            # -1: current position
+
+            # Note 6: grafting. if -1, no graft. Otherwise? graft is present.
+            #         When there IS a graft, 6 is replaced with the global number of the first grafted
+            #         bead.
+            # Note -1: the last index of the bead data, used as convention throughout the program.
 
             bead_data = [ID,
                          i,
-                         (i % len(bead_types))+1,
-                         bead_types[(i % len(bead_types))+1],
+                         bead_sequence[(i % len(bead_sequence))],
                          bond_type,
                          self.num_beads,
                          current_pos]
             
+            self.num_walk_beads += 1
             self.num_beads += 1
             self.index(current_cell).beads.append(bead_data)
 
@@ -479,15 +704,184 @@ class PolyLattice:
         self.num_bonds += numbeads - 1
         self.random_walked = True
 
-        self.walkinfo.append([ID, numbeads])
+        self.walkinfo[ID] = self.num_walk_beads
         return 1
 
+    def graft_chain(self, starting_bead, num_beads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, allowed_failures=10000):
+        """
+        This method is used to grow extra beads at a particular point in a given chain.
+        Intended to study the effects of different chain architectures on macroscopic properties.
 
-    def unbonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, bdist=None, prob=None, style='fene', allowed=None, allowed_failures = 50, ibonds=2, jbonds=1):
+        num_beads: the number of beads on the grafted chain
+        bead_types: the bead type sequence on the grafted chain
+        starting_bead: the bead that the new chain will be grafted to.
+
+        The algorithm works by *storing* the connection of a chain in terms of coordinates.
+        (Note: the coordinates of a bead are (A, B), where A is the walk number and B is the
+        number of the bead on that walk.)
+        Then, with a position randomly chosen about the bead that was specified for fixing,
+        a new random walk is generated.
+        """
+        def rand_distance(length, dimension):
+            """
+            Used to generate freely jointed chain models. This is the default option.
+            produces a vector with fixed length and random direction. 
+            length: fixed length of the vector.
+            dimension: self-explanatory
+            """
+            x = np.random.randn(dimension, 3)
+            magnitude = np.linalg.norm(x)
+
+            return length*(x/magnitude)
+        
+        def new_position(position, length, dimension, maxdis, phi=None, theta=None):
+            """
+            Copy from the previous. I should probably structure this better...
+            """
+            # need to flip between configurations of the angles
+            flipper = [-1, 1]
+            flip1 = random.sample(flipper,1)[0] # for theta
+            flip2 = random.sample(flipper,1)[0] # for phi
+            
+            if (phi == None and theta == None):            
+                new_pos = np.array(position) + rand_distance(length, dimension)
+                new_pos = new_pos[0]
+            elif (phi != None and theta != None):
+                theta = flip1*theta
+                phi = flip2*phi
+                x = length*m.cos(theta)*m.cos(phi) 
+                y = length*m.sin(theta)*m.sin(phi)
+                z = length*m.cos(theta)
+                new_pos = np.array(position) + np.array([x, y, z])
+            else:
+                if phi==None:
+                    phi = np.random.uniform(-m.pi, m.pi)
+                else:
+                    theta = np.random.uniform(-m.pi, m.pi)
+
+                theta = flip1*theta
+                phi = flip2*phi
+                                    
+                x = length*m.cos(theta)*m.cos(phi) 
+                y = length*m.sin(theta)*m.sin(phi)
+                z = length*m.cos(theta)
+                
+                new_pos = np.array(position) + np.array([x, y, z])
+
+            # Boundary conditions
+            for i in range(len(new_pos)):
+                if new_pos[i] < 0:
+                    new_pos[i] = maxdis + new_pos[i]
+                if new_pos[i] > maxdis:
+                    new_pos[i] = new_pos[i] - maxdis
+                
+            return new_pos
+
+        
+        # -------------------------------------------------------------------------------------
+        # bond type dictionary (same structure as for all files)
+        if self.bonds == None:
+            self.bonds = {}
+            self.bonds[0] = (Kval, cutoff, energy, sigma, style)
+        else:
+            repeat = 0
+            for i in range(len(self.bonds)):
+                if self.bonds[i] != (Kval, cutoff, energy, sigma, style):
+                    repeat += 1
+                else:
+                    store = self.bonds[i]
+
+            if repeat >= len(self.bonds):
+                self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
+                
+        bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
+
+        # assign the beads in the bead sequence into the used_types set
+        for i in bead_sequence:
+            if i not in self.interactions.used_types.append[i]:
+                self.interactions.used_types.append[i]
+        
+        # get the position of the starting bead
+        position = self.walk_data(starting_bead[0])[starting_bead[1]][-1]
+        bond = mini*sigma
+
+        # employ the same mechanism as in random_walk to find a suitable position.
+        too_close = True
+        generation_count = 0        
+        while too_close:
+            trial = new_position(position, bond, 1, self.cellside*self.cellnums, phi, theta)
+            
+            previous = position
+            current_pos = trial
+
+            neighbours = self.check_surroundings(current_pos)
+            issues = 0
+            index_c = self.which_cell(current_pos)
+            # neighbor checking takes place here.
+            for j in neighbours:            
+                index_n = self.which_cell(j[-1])
+                    
+                # deals with instances of periodicity, no different from the code above.
+                # to obtain the constant, calculate the maximum norm of two adjacent cell indices
+                if self.cellnums-1 in np.abs(index_c - index_n):
+                    period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                    real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                else:
+                    real_j = j[-1]                                            
+
+                distance = round(np.linalg.norm(current_pos - real_j), 5)
+                sigma = self.interactions.return_sigma(bead_sequence[0], j[2])
+                if distance < sigma:                        
+                    issues += 1
+                    break
+
+            if issues > 0:      
+                too_close = True
+                current_pos = previous
+            else:
+                too_close = False
+
+            # This has to be here: the failure condition is False when generation_count = 0
+            generation_count += 1
+            
+            if generation_count % allowed_failures == 0:
+                print("Position for graft bead not found. Consider reattempting with a sparser box.")
+                print("Graft unsuccessful.")
+                raise Exception("Program terminated.")
+
+        # the algorithm should by now have returned a valid position for the random walk. (or failed)
+        # now, all that's left is to run a random walk from this position.
+        graft_pos = current_pos
+        
+        self.random_walk(num_beads,
+                         Kval,
+                         cutoff,
+                         energy,
+                         sigma,
+                         bead_sequence,
+                         mini=1.12234,
+                         style='fene',
+                         phi=phi,
+                         theta=theta,
+                         starting_pos=list(graft_pos),
+                         restart=False,
+                         termination=None,
+                         allowed_failures=10000)
+
+        gbead_0 = [self.num_walks, 0]
+        self.graft_coords.append([starting_bead, gbead_0])
+        self.num_grafts += 1
+        self.num_bonds += 1
+            
+
+
+    def unbonded_crosslinks(self, bead_type, crosslinks, Kval, cutoff, energy, sigma, allowed=None,bdist=None, prob=1.0, style='fene', allowed_failures = 50, ibonds=2, jbonds=1):
         """ 
         This method initializes crosslinks that will move around the box before bonding within the simulation.
         This makes use of the "self.unbonded_links" paramater, which stores the properties of the bonds that will be created.
-        Arguments- crosslinks:     The number of crosslinks in the system.
+        Arguments- bead_types:     Type of the bead. Has to be declared manually beforehand.
+                                   (See interactions class)
+                   crosslinks:     The number of crosslinks in the system.
                    sigma:           The main range at which molecules can be linked.
                    mass:           Mass of the crosslinker cell
                    allowed:        A list of bead types that are allowed to crosslink with the unbonded beads.
@@ -495,45 +889,61 @@ class PolyLattice:
                    prob:           the probability of linking
                    numlinks:       the number of links the crosslink atom is allowed to make.
         """
-
+        if self.structure_ready == True:
+            raise EnvironmentError("Structures cannot be built or modified when simulation procedures are in place.")
+        
         if bdist == None:
             bdist=sigma
 
         if allowed == None:
-            allowed = [i for i in self.types]
-            
+            allowed = [i for i in self.interactions.types]
         # adding the bond detail of the crosslink to the system        
-        repeat = 0
-        for i in range(len(self.bonds)):
-            if self.bonds[i] != (Kval, cutoff, energy, sigma, style):
-                repeat += 1
-
-        if repeat >= len(self.bonds):
-            self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
+        if self.bonds == None:
+            self.bonds = {}
+            self.bonds[0] = (Kval, cutoff, energy, sigma, style)
+        else:
+            repeat = 0
+            for i in range(len(self.bonds)):
+                if self.bonds[i] != (Kval, cutoff, energy, sigma, style):
+                    repeat += 1
+                else:
+                    store = self.bonds[i]
+            if repeat >= len(self.bonds):            
+                self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
             
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
-        bead_type = len(self.types)+1
-
+        
         bond = sigma
-        self.types[bead_type] = mass
+        
         # Flagging up the presence of unbonded crosslinks within the system
-        self.cl_unbonded = True
+        if self.cl_unbonded == True:
+            s1 = "Unbonded crosslinks can only be defined once.\n"
+            s2 = "Multitype unbonded crosslinking is not yet supported in nanoPoly functionality.\n"
+            s3 = "Please contact the developer if you would like this functionality to be implemented.\n"
+            raise Exception(f"{s1}{s2}{s3}Program terminated")
+        else:
+            self.cl_unbonded = True
+        
         
         # arguments: 
-        # 0: 
-        # 1: 
-        # 2: 
-        # 3: 
-        # 4: 
-        # 5: 
-        # 6:
-        
+        # 0: the crosslink bead
+        # 1: the type of bond that the crosslink bead is allowed to have
+        # 2: the beads that the cl bead is allowed to link to 
+        # 3: the bonding distance
+        # 4: number of bonds allowed on the crosslink bead
+        # 5: number of bonds allowed on the attaching bead
+        # 6: probability of linking
+
         self.cl_bonding = [bead_type, bond_type, allowed, bdist, ibonds, jbonds, prob]
 
-        
+        # add bead type into the used_types list
+        if i not in self.interactions.used_types:
+            self.interactions.used_types.append(bead_type)
+
+        # increment the unbonded crosslinker structure count
+        self.num_uclstructs += 1
         for i in range(crosslinks):                    
             # trial for the initial position
-
             invalid_pos = True
             total_failure = False
             failure = 0
@@ -563,8 +973,9 @@ class PolyLattice:
                         real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
                     else:
                         real_j = j[-1]
-                
-                    if (np.linalg.norm(trial_pos - real_j) < self.lj_sigma):
+
+                    sigma = self.interactions.return_sigma(bead_type, j[2])
+                    if round(np.linalg.norm(trial_pos - real_j), 5) < sigma:
                         issues+=1
                         break # breaks out of the neighborlist search
                     
@@ -588,23 +999,23 @@ class PolyLattice:
                 print("---------------------------------------------------------------------------")
                 self.cl_bonding.append(i)                
                 return 0
-
-            bead = [self.num_walks+1,
-                    0,
-                    len(self.types),
-                    mass,
+            
+            bead = [f"uc{self.num_uclstructs}", # ubc: unbonded crosslinks
+                    self.num_uclbeads,
+                    bead_type,
                     bond_type,
                     self.num_beads,
-                    trial_pos]
-                        
+                    trial_pos]                        
                                                                         
             self.index(current_cell).beads.append(bead)
             self.num_beads += 1
-
+            self.num_uclbeads +=1
+        
         self.cl_bonding.append(crosslinks)
+        self.uclinfo[self.num_uclstructs] = self.num_uclbeads
 
                 
-    def bonded_crosslinks(self, crosslinks, mass, Kval, cutoff, energy, sigma, style='fene', forbidden=[], reaction=True, fail_count=30, selflinking=10, multilink=False):
+    def bonded_crosslinks(self, bead_type, crosslinks, Kval, cutoff, energy, sigma, style='fene', forbidden=[], reaction=True, fail_count=50, selflinking=10, multilink=False):
         """ 
         This method initializes crosslinks that are already bonded within the system.
         Carries out the crosslinking procedure in the system.
@@ -612,9 +1023,10 @@ class PolyLattice:
 
         Arguments- crosslink:     the number of crosslinks in the system
                    bond:          the main range at which molecules can be linked.
+                   
                    mass:          mass of the crosslinker cell
                    forbidden:     a list of bead types that are forbidden to crosslink
-n                   reaction:      whether the links were formed via a crosslinking reaction or not
+                   reaction:      whether the links were formed via a crosslinking reaction or not
                                   all this does is add an atom to the middle of the cross-linkers 
                    fail_count:    the number of attempts the function will make to find a valid crosslink.
                                   When 10 different crosslink sites are found to fail, the algorithm will 
@@ -623,6 +1035,9 @@ n                   reaction:      whether the links were formed via a crosslink
 ed.
                    multilink:     allows a bead to link multiple times.                   
         """
+        if self.structure_ready == True:
+            raise EnvironmentError("Structures cannot be built or modified when simulation procedures are in place.")
+        
         def rotation(axis, theta):
             """
             Implementation of a rotation matrix generator.
@@ -699,6 +1114,10 @@ ed.
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
         bond = sigma
 
+
+        # update the bonded crosslink count
+        self.num_bclstructs += 1
+
         # ---------------- compiling the full list of potential pairs. ------------------
         potential_pairs = []        
         for i in range(self.num_walks):
@@ -712,9 +1131,12 @@ ed.
                         # within linking distance
                         cond2 = (np.linalg.norm(neighbour[-1] - bead[-1]) < 2*bond)
                         # allowed to link                    
-                        cond3 = (neighbour[2] not in forbidden)
+                        cond3 = (neighbour[2] not in forbidden)                        
+                        # from a random walk, not a crosslinker bead
+                        cond4 = isinstance(neighbour[0], int)
                         
-                        if cond1 and cond2 and cond3:
+                        
+                        if cond1 and cond2 and cond3 and cond4:
                             potential_pairs.append((neighbour, bead))
         # -------------------------------------------------------------------------------
 
@@ -723,6 +1145,10 @@ ed.
             print("No sites for crosslinking. Simulation will run as planned.")
             return 1
         else:
+            # add bead type into the used_types list
+            if i not in self.interactions.used_types:
+                self.interactions.used_types.append(bead_type)
+                
             crosslink_data = []
             accepted_links = []
             if reaction == True:
@@ -736,7 +1162,7 @@ ed.
                 #-------------------------------------------------------------------------------
                                 
                 bad_links = 0 # number of links that failed to crosslink
-                              # used to evaluate situations where crosslinking clearly isn't working
+                # used to evaluate situations where crosslinking clearly isn't working
                               
                 complete_failure = 0 # flag that pops up when crosslinking is no longer possible
                 
@@ -798,7 +1224,9 @@ ed.
                             else:
                                 real_neighbour = neighbour[-1]                        
 
-                            if np.linalg.norm(real_neighbour - pot_cross_loc) < self.lj_sigma:
+                            distance = np.linalg.norm(real_neighbour - pot_cross_loc)
+                            sigma = self.interactions.return_sigma(bead_type, neighbour[2])
+                            if distance < sigma:
                                 issue = 1
                                 break
 
@@ -830,20 +1258,17 @@ ed.
                         continue
                     else:
                         accepted_links.append(link)
-                        if len(accepted_links) == 1:
-                            # we have crosslinkers - they can be added to the types dictionary
-                            self.types[len(self.types)+1] = mass
-                            
-                        bead = [self.num_walks+1,
-                                0,
-                                len(self.types),
-                                mass,
+
+                        bead = [f"bc{self.num_bclstructs}",
+                                self.num_bclbeads,
+                                bead_type,
                                 bond_type,
                                 self.num_beads,
                                 pot_cross_loc]
                         
                         self.num_beads += 1
                         self.num_bonds += 2
+                        self.num_bclbeads += 1
                         
                         # adds bead to the lattice cell that it's in
                         current_cell = self.which_cell(bead[-1])
@@ -852,8 +1277,7 @@ ed.
 
                 # adds crosslinker atom to bead-type list
                 self.crosslinks_loc += crosslink_data
-                self.num_walks += 1
-                
+                self.bclinfo[self.num_bclstructs] = self.num_bclbeads
 
                 # termination condition
                 # can be used to allow control flow operations
@@ -865,7 +1289,6 @@ ed.
             else:
                 # generic network crosslinking
                 self.crosslinks_loc = crosslink_data
-        
 
 
     #---------------------------------------------------------------------------------------------
@@ -876,7 +1299,9 @@ ed.
         
         for cell in self.Cells:
             for bead in cell.beads:
-                all_data.append(bead)
+                if isinstance(bead[0], int):
+                    all_data.append(bead)
+
                 
         all_data.sort(key = lambda x: (x[0], x[1]))
         
@@ -885,25 +1310,20 @@ ed.
         else:
             return [i for i in all_data if (i[0] == which_ID)]
 
-
-    def plot_walk(self, ID, ax, col, bonds = False, size=50):
-        if ID == 'S':
-            ID = sys.maxsize
-        my_walk = [i[-1] for i in self.walk_data(ID)]
+    def crosslink_data(self, which_ID = None):
+        all_data = []
         
-        xvals = []
-        yvals = []
-        zvals = []
-
-        for i in my_walk:
-            xvals.append(i[0])
-            yvals.append(i[1])
-            zvals.append(i[2])
+        for cell in self.Cells:            
+            for bead in cell.beads:
+                if isinstance(bead[0], str):
+                    all_data.append(bead)
+                
+        all_data.sort(key = lambda x: (x[0], x[1]))
         
-        col= col
-        ax.scatter(xvals, yvals, zvals, c=col, s=size)
-        if (bonds == True):
-            ax.plot(xvals, yvals, zvals, color=col)
+        if (which_ID == None):
+            return all_data
+        else:
+            return [i for i in all_data if (i[0] == which_ID)]
 
     def file_dump(self, filename):
         """
@@ -918,20 +1338,15 @@ ed.
             with open(filename, 'w') as file:
                 file.write("SIMULATION OF ENTANGLED POLYMER SYSTEM\n")
                 # gathers data using function above.
-                all_data = self.walk_data()
+                all_data = self.walk_data() + self.crosslink_data()
                     
                 for data in all_data:
-                    if data[0] == self.crosslink_id:
-                        print("Needs to be types+1")
-                        bead_ID = 'C'
-                    else:
-                        bead_ID = str(data[0])
-                        
                     data = [str(data[0]),
                             str(data[1]),
                             str(data[2]),
                             str(data[3]),
                             str(data[4]),
+                            str(data[5]),
                             str(round(data[-1][0], 8)),
                             str(round(data[-1][1], 8)),
                             str(round(data[-1][2], 8))]
@@ -950,7 +1365,6 @@ ed.
             print("#############################################################################")
             print("There is at least one existing random walk in this box.")
             print("It is likely that self-avoiding constraints will not be effective against the \ncontents of the data file.")
-            print("Uploading the data file before running a random walk is highly suggested.")
             
         with open(filename) as f:
             read_data = f.readlines()

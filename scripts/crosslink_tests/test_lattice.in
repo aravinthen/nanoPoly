@@ -1,0 +1,33 @@
+#-----------------------------------------------------------------------------------
+# NANOPOLY - POLYMER NANOCOMPOSITE SIMULATION FILE                                  
+# Full project files can be found at: https://github.com/aravinthen/nanoPoly        
+#-----------------------------------------------------------------------------------
+# FILENAME: test_lattice.in                                                        
+# DATE: 2021-04-28                                                                     
+# OVERVIEW:                                                                         
+#    Number of polymer chains:     15                     
+#    Number of crosslinks:         28           
+#    Nanostructure:                None                 
+#-----------------------------------------------------------------------------------
+                                                                                      
+variable structure index test_structure.in                                             
+variable simulation index test_lattice.in                                            
+                                                                                      
+# Initialization settings                                                             
+units              lj                                                                 
+boundary           p p p                                                              
+atom_style         bond                                                       
+log                log.${simulation}.txt                                            
+                                                                                      
+# read data from object into file                                                     
+read_data          ${structure} extra/special/per/atom 100 extra/bond/per/atom 100  
+
+# define interactions                                                                 
+neighbor      0.4 bin                                                                 
+neigh_modify  every 10 one 10000                                                      
+comm_modify   mode single cutoff 1.9 vel yes                                      
+pair_style    lj/cut 1.5                                        
+pair_coeff    * * 0.05 0.3            
+bond_style    fene  
+special_bonds fene  
+bond_coeff    1 30.0 1.0 0.05 0.4 

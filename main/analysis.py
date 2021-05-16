@@ -27,8 +27,9 @@ class Check:
         print(f"-------------------------------------------------------------------------------")
         print(f"Distance Errors:")
         print(f"G.num_b\tG.num_n\tWalk_b\tWalk_n\twnum_b\twnum_n\tDistance")
-        
-        for bead in self.polylattice.walk_data():
+
+        all_data = self.polylattice.walk_data() + self.polylattice.cl_data()
+        for bead in all_data:
             error_count = 0
             nlist = self.polylattice.check_surroundings(bead[-1])
             occ = len(nlist)
