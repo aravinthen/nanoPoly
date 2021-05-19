@@ -544,24 +544,24 @@ class PolyLattice:
                     invalid_start = False
                     failure = 0        
 
-                if total_failure == True:
-                    print("\nThe number of permitted failures for the starting position have")
-                    print("exceeded the set value. The box is too dense for valid position to")
-                    print("be found.")
-                    print("It is recommended to run the algorithm in a less packed box.")
-                    raise Exception("Program terminated.")
+            if total_failure == True:
+                print("\nThe number of permitted failures for the starting position have")
+                print("exceeded the set value. The box is too dense for valid position to")
+                print("be found.")
+                print("It is recommended to run the algorithm in a less packed box.")
+                raise Exception("Program terminated.")
 
-                # The full data entry for keeping track of the bead.
-                bead_data = [ID,
-                             0,
-                             bead_sequence[0],
-                             bond_type,
-                             self.num_beads,
-                             starting_pos]
+            # The full data entry for keeping track of the bead.
+            bead_data = [ID,
+                         0,
+                         bead_sequence[0],
+                         bond_type,
+                         self.num_beads,
+                         starting_pos]
 
-                self.num_beads+=1
-                self.num_walk_beads += 1 # the individual count for the number of beads specific to a walk
-                self.index(current_cell).beads.append(bead_data)
+            self.num_beads+=1
+            self.num_walk_beads += 1 # the individual count beads that make up a walk
+            self.index(current_cell).beads.append(bead_data)
         
         # Begin loop here.
         bead_number = 1
