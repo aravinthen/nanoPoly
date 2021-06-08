@@ -12,39 +12,38 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 50.0
+box_size = 10.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=100)
+box = PolyLattice(box_size, cellnums=50)
 t1 = time.time()
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
-                         (0.3, 1.0, 1.5))
+                         (1.0, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (0.3, 0.5, 1.5),
+                         (1.0, 0.5, 1.5),
                          ('a,b', (0.3, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
 
-num_walks = 600
-size = 800
+num_walks = 1
+size = 20
 # size of the chain
-rw_kval = 40.0
+rw_kval = 1.0
 rw_cutoff = 3.5
 rw_epsilon = 1.0
-rw_sigma = 0.4
+rw_sigma = 1.0
 
 
 # block = 100
 copolymer = []
-for i in range(40):
+for i in range(1500):
     copolymer.append('a')
-for i in range(720):
+for i in range(1500):
     copolymer.append('b')
-for i in range(40):
-    copolymer.append('a')
+
 
 random_copolymer = []
 
@@ -67,10 +66,6 @@ for i in range(num_walks):
 total_time+= t1-t0
 print(f"Walks complete. Total time: {total_time} seconds")
 
-# vector that controls nature of deformation.
-strain = [-1e-2, -1e-2, -1e-2]
-#         xx    yy    zz   xy  yz  yz
-# box.simulation.deform(10000, timestep, strain, 0.3, reset=False, description=desc3)
 t0 = time.time()
 box.simulation.structure("test_structure.in")
 t1 = time.time()
@@ -81,21 +76,54 @@ box.simulation.settings("test_settings.in")
 desc1 = "testing"
 
 timestep = 1e-3
-box.simulation.equilibrate(50000,
+dmp = 1
+box.simulation.equilibrate(100,
                            timestep,
-                           0.05,
+                           1.0,
                            'langevin',
                            output_steps=100,
                            description=desc1,
-                           dump=1000)
+                           dump=dmp)
 
-strain = [-2e-2, -2e-2, -2e-2]
-# box.simulation.deform(10000, timestep, strain, 0.1, reset=False, description=desc1)
+# strain1 = [-2e-2, -2e-2, -2e-2]
+# strain2 = [1e-1, 1e-1, 0]
+# strain3 = [0, 0, 1]
 
-view_path = "~/ovito/build/bin/ovito"
+# box.simulation.deform(5000, 
+#                       timestep,
+#                       strain1,
+#                       0.5,
+#                       reset=False,
+#                       dump=dmp,
+#                       description=desc1)
 
-# box.simulation.view(view_path, "test_structure.in")
+# box.simulation.equilibrate(5000,
+#                            timestep,
+#                            0.1,
+#                            'nose-hoover',
+#                            output_steps=100,
+#                            description=desc1,
+#                            reset=False,
+#                            dump=dmp)
+# box.simulation.deform(2500, 
+#                       timestep,
+#                       strain2,
+#                       0.1,
+#                       reset=False,
+#                       dump=dmp,
+#                       description=desc1)
 
-# add mpi=7 argument to run with mpi
-box.simulation.run(folder="big_copolymer", mpi=7)
+# box.simulation.deform(500, 
+#                       timestep,
+#                       strain3,
+#                       0.1,
+#                       reset=False,
+#                       dump=dmp,
+#                       description=desc1)
 
+# view_path = "~/ovito/build/bin/ovito"
+
+# # box.simulation.view(view_path, "test_structure.in")
+
+# # add mpi=7 argument to run with mpi
+box.simulation.run(folder="testing")

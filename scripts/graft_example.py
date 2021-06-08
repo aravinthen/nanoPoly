@@ -21,23 +21,18 @@ print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t
 
 # Atom interactions
 # TYPES
-box.interactions.newType("a", 0.5,
-                         (0.2, 2,1))
+box.interactions.newType("a", 1.0,
+                         (0.3, 0.01, 1.5))
 
-box.interactions.newType("b", 1.0,
-                         (0.3,3,1),
-                         ('a,b', (0.3,4,2)))
+box.interactions.newType("b", 0.5,
+                         (0.3, 0.15, 1.5),
+                         ('a,b', (0.3, 0.01, 1.5)))
 
-box.interactions.newType("c", 1.0,
-                         (0.2, 3,1),
-                         ('c,a', (0.2,4,2)),
-                         ('c,b', (0.2,4,2)))
+box.interactions.newType("c", 0.3,
+                         (0.2, 0.1, 1.5),
+                         ('c,a', (0.3, 0.01, 1.5)),
+                         ('c,b', (0.2, 0.01, 1.5)))
 
-box.interactions.newType("d", 1.0,
-                         (0.2, 3,1),
-                         ('d,a', (0.1,4,2)),
-                         ('d,b', (0.15,4,2)),
-                         ('d,c', (0.2,4,2)))
 
 # following values determine the bonding of the random walks
 size = 100 # size of the chain
@@ -47,7 +42,7 @@ rw_epsilon = 0.05
 rw_sigma = 0.3
 graft_spacing = 20
 graft_size = 10
-graft_num = 4
+graft_num = 1
 
 total_time = 0
 t0 = time.time()
@@ -70,7 +65,7 @@ for i in range(1, size, graft_spacing):
                         rw_cutoff,
                         rw_epsilon,
                         rw_sigma,
-                        bead_sequence=['c','d'])
+                        bead_sequence=['c'])
     print(f"Graft {i} completed.")
 
 
@@ -106,9 +101,20 @@ strain = [-1e-2, -1e-2, -1e-2]
 box.simulation.structure("test_structure.in")
 box.simulation.settings("test_settings.in")
 
+timestep = 0.01
+box.simulation.equilibrate(25000,
+                           timestep,
+                           0.1,
+                           'langevin',
+                           output_steps=1000,
+                           description="graft test",
+                           dump=100)
+
 view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure.in")
-# box.simulation.run(folder="long_biax_test")
+# box.simulation.view(view_path, "test_structure.in")
+
 # add mpi=7 argument to run with mpi
-# box.simulation.run(folder="comp_test")
+box.simulation.run(folder="graft_test")
+
+
 
