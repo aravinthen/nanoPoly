@@ -12,10 +12,13 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 10.0
+box_size = 100.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=50)
+box = PolyLattice(box_size, cellnums=80)
 t1 = time.time()
+
+simname = "big_test"
+dmp = 100
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
 # Order of properties: Sigma, energy, cutoff
@@ -23,16 +26,16 @@ box.interactions.newType("a", 1.0,
                          (1.0, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (1.0, 0.5, 1.5),
+                         (0.5, 0.5, 1.5),
                          ('a,b', (0.3, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
 
-num_walks = 1
-size = 20
+num_walks = 50
+size = 800
 # size of the chain
-rw_kval = 1.0
-rw_cutoff = 3.5
+rw_kval = 30
+rw_cutoff = 1.5
 rw_epsilon = 1.0
 rw_sigma = 1.0
 
@@ -76,8 +79,7 @@ box.simulation.settings("test_settings.in")
 desc1 = "testing"
 
 timestep = 1e-3
-dmp = 1
-box.simulation.equilibrate(100,
+box.simulation.equilibrate(5000,
                            timestep,
                            1.0,
                            'langevin',
@@ -85,17 +87,17 @@ box.simulation.equilibrate(100,
                            description=desc1,
                            dump=dmp)
 
-# strain1 = [-2e-2, -2e-2, -2e-2]
+strain1 = [-2e-2, -2e-2, -2e-2]
 # strain2 = [1e-1, 1e-1, 0]
 # strain3 = [0, 0, 1]
 
-# box.simulation.deform(5000, 
-#                       timestep,
-#                       strain1,
-#                       0.5,
-#                       reset=False,
-#                       dump=dmp,
-#                       description=desc1)
+box.simulation.deform(50000, 
+                      timestep,
+                      strain1,
+                      0.5,
+                      reset=False,
+                      dump=dmp,
+                      description=desc1)
 
 # box.simulation.equilibrate(5000,
 #                            timestep,
@@ -126,4 +128,4 @@ box.simulation.equilibrate(100,
 # # box.simulation.view(view_path, "test_structure.in")
 
 # # add mpi=7 argument to run with mpi
-box.simulation.run(folder="testing")
+box.simulation.run(folder=simname)

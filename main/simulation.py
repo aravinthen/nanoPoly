@@ -27,7 +27,8 @@ class Simulation:
         self.file_name = None   # name of file. This is set in settings().
         self.data_file = None   # name of datafile. This is set in structure().
         
-        self.dumping = 0 # used for dumping files
+        self.dumping = 0 # used to turn on dumping
+        self.global_dump = 0 # used to move dump files into a folder
         self.data_production = 0
 
         self.set_settings = False
@@ -140,8 +141,9 @@ Atoms                                                                           
             f.write(f"\t{bead_num+1}\t{walk}\t{bead_type}\t{x:.5f}\t\t{y:.5f}\t\t{z:.5f}\t\n")
 
         # BOND DATA            
-        # reading in the bond data        
-        f.write("\
+        # reading in the bond data
+        if self.polylattice.num_bonds > 0:        
+            f.write("\
 Bonds                                                                               \n\
                                                                                     \n")
         # READ BOND DATA: RANDOM WALKS
@@ -179,12 +181,14 @@ Bonds                                                                           
 
 #-----------------------------------------------------------------------------------------------------
 
-    def settings(self, filename=None, dielectric=False):
+    def settings(self, filename=None, nlist=[10,1000], dielectric=False):
         """ 
         NOTE: This comes SECOND in the simulation order of precedence!
               Will flag an error if sim_structure hasn't run first.
         This is where we define the header, the units and system settings.        
-        Variables - fname: name of the simulation input script file.
+        Variables - nlist: the neighbour list build number
+                               if the simulation provides dangerous builds, make this more frequent.
+                    filename: name of the simulation input script file.
                     dielectric: whether the material is dielectric or not.
                                 WARNING! needs a bit of confirmation.
         """
@@ -194,7 +198,7 @@ Bonds                                                                           
         def dictionary_shuffle(my_dict, key_of_list):
             """
             Sorts a dictionary of lists by one of the indices shared in the list.
-            Arguments: my_dict     - dictionary that is to ben shuffled
+            Arguments: my_dict     - dictionary that is to ben shuffled                      
                        key_of_list - key of list in dictionary entry that is to be shuffled
             """
             styles_dict = {}
@@ -262,9 +266,10 @@ read_data          ${{structure}}                                               
                                                    
         f.write(f"\n\
 # define interactions                                                                 \n\
-neighbor      0.4 multi                                                               \n\
-neigh_modify  every 10 one 10000                                                      \n\
+neighbor      1.0 multi                                                               \n\
+neigh_modify  every {nlist[0]} one {nlist[1]}                                         \n\
 ")
+
 
         # add pair interactions of different beads
         for i in range(np.shape(self.polylattice.interactions.type_matrix)[0]):
@@ -296,14 +301,17 @@ special_bonds fene  \n")
             for data in styles_dict[style]:
                 f.write(f"\
 bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {np.around(data[1][1],decimals=5)} {np.around(data[1][2], decimals=5)} {np.around(data[1][3],decimals=5)} \n")
-                
+
+        f.write(f"\
+compute         1 all stress/atom NULL \n\
+")
         # ensures that the settings have been set.
         # this must be true for equilibration to take place.
         self.set_settings = True
 
         f.close()
 
-    def equilibrate(self, steps, timestep, temp, dynamics, bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=True, description=None):
+    def equilibrate(self, steps, timestep, temp, dynamics, bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=False, description=None):
         """
         ARGUMENTS:
         steps      - the number of steps taken in the equilibration
@@ -342,13 +350,13 @@ bond_coeff    {data[0]+1} {np.around(data[1][0], decimals=4)} {np.around(data[1]
         f.write("\
 #---------------------------------------------------------------------------------------------------\n\
 ")
+
         if dynamics=='langevin':            
             if dump>0:
+                self.global_dump = 1
                 self.dumping = 1
                 f.write(f"\
-compute         1 all stress/atom NULL \n\
-dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3] \n\
-\n\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
 ")
             f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
@@ -386,6 +394,12 @@ run             {steps} \n\
 unfix 1         \n\
 unfix 2         \n\
 ")
+            if self.dumping == 1:
+                self.dumping = 0
+                f.write(f"\
+undump 1        \n\
+")
+
             if bonding == True:
                 for i in range(1, self.polylattice.interactions.num_types):
                     f.write(f"\
@@ -395,12 +409,12 @@ unfix {i+2} \n\
             f.write(f"\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
-        if dynamics=='nose_hoover':
+        if dynamics=='nose-hoover':
             if dump>0:
+                self.global_dump = 1
                 self.dumping = 1
                 f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
-\n\
 ")
             f.write(f"\
 fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
@@ -416,11 +430,18 @@ reset_timestep  0\n\
 run             {steps} \n\
 unfix 1         \n\
 unfix 2         \n\
+")
+            if self.dumping == 1:
+                self.dumping = 0
+                f.write(f"\
+undump 1        \n\
+")
+            f.write(f"\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
             f.close()
 
-    def deform(self, steps, timestep, strain, temp, final_temp=None, damp=None, datafile=True, output_steps=100, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), seed=random.randrange(0,99999), description = None):
+    def deform(self, steps, timestep, strain, temp, final_temp=None, damp=None, datafile=True, output_steps=100, dump=0, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), seed=random.randrange(0,99999), description = None):
         """
         Carries out the deformation of the box. 
         Note: strain MUST be a six-dimensional list/vector.
@@ -449,9 +470,18 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
         
         f.write(f"\
 run             0            \n\
+")
+        if dump>0:
+            self.dumping = 1
+            self.global_dump = 1
+            f.write(f"\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
+")
+
+        f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
 fix             1 all langevin {float(temp)} {float(final_temp)} {damp} {seed} \n\
-fix             2 all nve/limit {self.polylattice.lj_sigma}\n\
+fix             2 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
 fix		3 all deform 1 x trate {strain[0]} y trate {strain[1]} z trate {strain[2]} units box remap x \n\
 ")
         if datafile==True:
@@ -481,6 +511,11 @@ unfix 1                                                \n\
 unfix 2                                                \n\
 unfix 3                                                \n\
 ")
+        if self.dumping == 1:
+            self.dumping = 0
+            f.write(f"\
+undump 1        \n\
+")
         if datafile == True:
             f.write(f"\
 unfix datafile \n\
@@ -491,7 +526,7 @@ unfix datafile \n\
         Carries out the LAMMPS run.
         """
         correct_dumping = 0
-        if self.dumping == 1 or self.data_production == 1:
+        if self.global_dump == 1 or self.data_production == 1:
             if folder==None:
                 print("No directory for dumping: files will be dumped in working directory.")
                 print("Note that this is usually considered a bad move.")
@@ -518,7 +553,7 @@ unfix datafile \n\
         if correct_dumping == 1:
             if self.data_production == 1:
                 os.system(f"mv *.data* {folder}")   
-            if self.dumping == 1:
+            if self.global_dump == 1:
                 os.system(f"mv *dump.* {folder}")   
  
             os.system(f"mv *restart.* {folder}")

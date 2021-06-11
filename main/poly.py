@@ -61,7 +61,7 @@ class PolyLattice:
 
     class Interactions:
         """All the interactions between beads are stored here."""
-        def __init__(self):
+        def __init__(self, max_dist):
             self.types = {}
             self.typekeys = {}
             self.type_matrix = None
@@ -69,7 +69,7 @@ class PolyLattice:
             self.energy_matrix = None  # interaction energies between types
             self.cutoff_matrix = None  # cutoff between types
             self.used_types = []        # the types that are actually used in the simulation
-
+            self.max_dist = max_dist
             self.num_types = 0 # the number of types present in the box
 
         def newType(self, type_id, mass, potential, *args):
@@ -79,6 +79,12 @@ class PolyLattice:
             """
             if not type_id.isalnum():
                 raise TypeError("Names must be composed of only alphanumeric characters.")
+
+            if potential[0]*1.12234 > self.max_dist:
+                error1 = "Error! The LJ-distance minimum is greater than the box grid spacing."
+                error2 = "This means that random walk algorithm may not detect beads of this type."
+                error3 = "Please respecify the number of cells within the box."
+                raise SystemError(f"\n{error1}\n{error2}\n{error3}")
             
             if self.num_types == 0:
                 if len(args) > 0:
@@ -209,7 +215,7 @@ class PolyLattice:
 
 
         # initializing the interactions class
-        self.interactions = self.Interactions()
+        self.interactions = self.Interactions(self.cellside)
 
         # attached libraries
         self.simulation = Simulation(self) # the simulation class
@@ -358,7 +364,7 @@ class PolyLattice:
         PARAMETER - termination: THREE OPTIONS - a) None, b) Retract and c) Break
                     
         Notes: Nested functions prevent the helper functions from being used outside of scope.       
-        """
+        """        
 
         if self.structure_ready == True:
             raise EnvironmentError("Structures cannot be built or modified when simulation procedures are in place.")
@@ -463,7 +469,7 @@ class PolyLattice:
                 # check the sigma distance
                 # the lhs is the distance between the bead and the neighbour
                 distance = np.linalg.norm(starting_pos - real_j)
-                if distance < self.interactions.return_sigma(bead_sequence[0], j[2]):
+                if distance < mini*self.interactions.return_sigma(bead_sequence[0], j[2]):
                     issues+=1
                     break # stop checking neighbours
                 
@@ -521,7 +527,7 @@ class PolyLattice:
                     # check the sigma distance
                     # the lhs is the distance between the bead and the neighbour
                     distance = np.linalg.norm(starting_pos - real_j)
-                    if distance < self.interactions.return_sigma(bead_sequence[0], j[2]):
+                    if distance < mini*self.interactions.return_sigma(bead_sequence[0], j[2]):
                         issues+=1
                         break # stop checking neighbours
 
@@ -546,7 +552,7 @@ class PolyLattice:
 
             if total_failure == True:
                 print("\nThe number of permitted failures for the starting position have")
-                print("exceeded the set value. The box is too dense for valid position to")
+                print("exceeded the set value. The box is too dense for a valid position to")
                 print("be found.")
                 print("It is recommended to run the algorithm in a less packed box.")
                 raise Exception("Program terminated.")
@@ -605,7 +611,7 @@ class PolyLattice:
                         real_j = j[-1]                                            
 
                     distance = round(np.linalg.norm(current_pos - real_j), 5)
-                    sigma = self.interactions.return_sigma(bead_type, j[2])
+                    sigma = mini*self.interactions.return_sigma(bead_type, j[2])
                     if distance < sigma:                        
                         issues += 1
                         break
@@ -798,8 +804,8 @@ class PolyLattice:
 
         # assign the beads in the bead sequence into the used_types set
         for i in bead_sequence:
-            if i not in self.interactions.used_types.append[i]:
-                self.interactions.used_types.append[i]
+            if i not in self.interactions.used_types:
+                self.interactions.used_types.append(i)
         
         # get the position of the starting bead
         position = self.walk_data(starting_bead[0])[starting_bead[1]][-1]
