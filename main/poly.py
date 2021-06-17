@@ -343,7 +343,7 @@ class PolyLattice:
 
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
     
-    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, starting_pos=None, restart=False, termination=None, allowed_failures=10000):
+    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, starting_pos=None, soften=True, termination=None, initial_failures=10000, walk_failures=10000):
         """
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -446,8 +446,7 @@ class PolyLattice:
                 self.bonds[len(self.bonds)] = (Kval, cutoff, energy, sigma, style)
                 
         bond_type = [i for i in range(len(self.bonds)) if self.bonds[i]==(Kval, cutoff, energy, sigma, style)][0]+1
-
-
+        
         # put the types of being used in the random walk into the used types set
         for i in bead_sequence:
             if i not in self.interactions.used_types:
@@ -535,11 +534,12 @@ class PolyLattice:
                     invalid_start = True
                     failure+=1
                     
-                    if failure > allowed_failures:
-                        if restart == True:
+                    if failure > initial_failures:                        
+                        if soften == True:
                             print(f"Failure tolerance reached at random walk {self.num_walks}.")
-                            print("Restarting the walk is recommended.")
+                            print(f"Softening minimum requirement by 1%. Current minima: {mini}")
                             total_failure = False
+                            mini = 0.99*mini
                             failure = 0
                             issues = 0
                         else:
@@ -568,6 +568,8 @@ class PolyLattice:
             self.num_beads+=1
             self.num_walk_beads += 1 # the individual count beads that make up a walk
             self.index(current_cell).beads.append(bead_data)
+
+        mini = 1.12234 # resetting minimum
         
         # Begin loop here.
         bead_number = 1
@@ -626,7 +628,7 @@ class PolyLattice:
                 generation_count += 1
 
                 # FAILURE CONDITIONS -------------------------------------------------------------
-                if generation_count % allowed_failures == 0:
+                if generation_count % walk_failures == 0:
                     if termination == "break":
                         new_numbeads = numbeads - i
                         self.num_beads += i
@@ -661,6 +663,10 @@ class PolyLattice:
                         progress = self.walk_data(ID)
                         current_pos = progress[-1][-1]
 
+                    elif termination == "soften":
+                        print(f"Failure tolerance reached at bead walk {self.num_beads}.")
+                        print(f"Softening minimum requirement by 1%. Current minima: {mini}")
+                        mini = 0.99*mini
                     else:                        
                         raise Exception("Program terminated.")
                         print("")
@@ -674,7 +680,8 @@ class PolyLattice:
                         print("c) a smaller step distance.")
                         
                 # -----------------------------------------------------------------------------------
-                
+
+            mini = 1.12234
             current_pos = trial_pos
             current_cell = self.which_cell(current_pos)
 

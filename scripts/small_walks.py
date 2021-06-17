@@ -31,7 +31,7 @@ box.interactions.newType("b", 0.5,
 
 # following values determine the bonding of the random walks
 
-num_walks = 50
+num_walks = 600
 size = 800
 # size of the chain
 rw_kval = 30
@@ -59,8 +59,10 @@ for i in range(num_walks):
                     rw_epsilon,
                     rw_sigma,
                     bead_sequence = copolymer,
-                    allowed_failures= 1000000,
-                    termination="retract")
+                    initial_failures= 10000,
+                    walk_failures = 1000,
+                    soften=True,
+                    termination="soften")
     t1 = time.time()
     total_time+= t1-t0
     print(f"Walk {i} completed in {t1-t0} seconds. Total time elapsed: {total_time}")
@@ -123,9 +125,8 @@ box.simulation.deform(50000,
 #                       dump=dmp,
 #                       description=desc1)
 
-# view_path = "~/ovito/build/bin/ovito"
-
-# # box.simulation.view(view_path, "test_structure.in")
+view_path = "~/ovito/build/bin/ovito"
+box.simulation.view(view_path, "test_structure.in")
 
 # # add mpi=7 argument to run with mpi
-box.simulation.run(folder=simname)
+# box.simulation.run(folder=simname)
