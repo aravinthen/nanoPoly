@@ -31,7 +31,7 @@ box.interactions.newType("b", 0.5,
 
 # following values determine the bonding of the random walks
 
-num_walks = 600
+num_walks = 100
 size = 800
 # size of the chain
 rw_kval = 30

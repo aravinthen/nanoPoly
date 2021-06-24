@@ -205,8 +205,8 @@ class PolyLattice:
         epsilon: lennard jones energy
         celltotal: total number of cells in lattice.
         """
-        self.boxsize = boxsize # NOT GUARANTEED!!!!        
-        self.cellnums = cellnums # the lj distance between two 
+        self.boxsize = boxsize 
+        self.cellnums = cellnums 
         self.cellside = self.boxsize/self.cellnums
         self.celltotal = self.cellnums**3
         
@@ -342,7 +342,59 @@ class PolyLattice:
                          (cell_index[2]+k)%self.cellnums] for i in range(-1,2) for j in range(-1,2) for k in range(-1,2))
 
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
-    
+
+
+    def find_low_density(self, region=0, quals=1):
+        """
+        Used to find the regions of the box with the lowest densities.
+        Only to be employed when the box is VERY dense!
+        Region: the region over which partial densities of the box are calculated.
+        quals: the number of cells allowed to qualify
+        """
+        low_density = 1
+        low_dense_cells = []
+        t0 = time.time()
+        for i in range(self.cellnums):
+            for j in range(self.cellnums):
+                for k in range(self.cellnums):
+                    cell = self.index([i,j,k])
+                    density = len(cell.beads)/self.num_beads
+                    if density < low_density:
+                        low_density = density
+                        low_dense_cells = [[i,j,k]]
+                    if density == low_density:
+                        low_dense_cells.append([i,j,k])
+
+        t1 = time.time()
+        print(f"{t1-t0}")
+        
+        if region == 0:
+            return low_dense_cells
+        else:
+            t0 = time.time()
+            densities = []
+            for cell_ind in low_dense_cells:
+                # find all cells adjacent by the region unit
+                bead_count = 0
+                for i in range(-region,region+1):
+                    for j in range(-region,region+1):
+                        for k in range(-region,region+1):
+                            region_index = [(cell_ind[0]+i)%self.cellnums,
+                                              (cell_ind[1]+j)%self.cellnums,
+                                              (cell_ind[2]+k)%self.cellnums]
+
+                            region_cell = self.index(region_index)                            
+                            bead_count+=len(region_cell.beads)
+                            
+                densities.append((bead_count/self.num_beads, region_index))
+
+            # qualifiers
+            densities.sort(key=lambda x: x[0])
+            t1 = time.time()
+            print(f"{t1-t0}")
+            return [i[1] for i in densities][0:quals]
+
+                            
     def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, starting_pos=None, soften=True, termination=None, initial_failures=10000, walk_failures=10000):
         """
         Produces a random walk.
@@ -1403,5 +1455,23 @@ ed.
             current_cell = self.which_cell(datum[-1])
             self.index(current_cell).beads.append(datum)
 
+    def see_distribution(self,):
+        """allows user to view the distribution of beads within the system"""
+        from mpl_toolkits import mplot3d
+        import matplotlib.pyplot as plt
+        
+        fig = plt.figure()
+        ax = plt.axes(projection='3d')
+        for i in range(self.cellnums):
+            for j in range(self.cellnums):
+                for k in range(self.cellnums):
+                    cell = self.index([i,j,k])
+                    pos = cell.position
+                    ax.scatter3D(pos[0]+0.5*self.cellside,
+                                 pos[1]+0.5*self.cellside,
+                                 pos[2]+0.5*self.cellside,
+                                 s=len(cell.beads)**2)
+        plt.show()
+    
 
     # ----------------------------- END OF CLASS ----------------------------
