@@ -17,12 +17,12 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 100.0
+box_size = 10.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=60)
+box = PolyLattice(box_size, cellnums=8)
 t1 = time.time()
 
-simname = "big_test"
+simname = "condensed_relax2"
 dmp = 100
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
@@ -99,5 +99,38 @@ total_time+= t1-t0
 
 # box.see_distribution()
 box.simulation.structure("test_structure.in")
+
 view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure.in")
+# box.simulation.view(view_path, "test_structure.in")
+box.simulation.settings("test_settings.in") 
+desc1 = "testing"
+
+timestep = 1e-3
+box.simulation.equilibrate(15000,
+                           timestep,
+                           1.0,
+                           'langevin',
+                           output_steps=100,
+                           description=desc1,
+                           dump=dmp)
+
+strain1 = [-2e-2, -2e-2, -2e-2]
+
+box.simulation.deform(5000, 
+                      timestep,
+                      strain1,
+                      0.5,
+                      reset=False,
+                      dump=dmp,
+                      description=desc1)
+
+box.simulation.equilibrate(50000,
+                           timestep,
+                           1.0,
+                           'nose-hoover',
+                           output_steps=100,
+                           description=desc1,
+                           dump=dmp)
+
+# add mpi=7 argument to run with mpi
+box.simulation.run(folder=simname)

@@ -1,6 +1,6 @@
-# Program Name: walks_example.py
+# Program Name: parker_rottler.py
 # Author: Aravinthen Rajkumar
-# Description: nanopoly configuration that just runs the random walks
+# Description: recreation of parker-rottler simulation
 
 import numpy as np
 import time
@@ -12,41 +12,39 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 50.0
+box_size = 100.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=100)
+box = PolyLattice(box_size, cellnums=80)
 t1 = time.time()
+
+simname = "walks_example"
+dmp = 100
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
-                         (0.3, 1.0, 1.5))
+                         (1.0, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (0.3, 0.5, 1.5),
-                         ('a,b', (0.3, 0.2, 1.5)))
+                         (1.0, 1.0, 1.5),
+                         ('a,b', (1.0, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
-
-num_walks = 600
+num_walks = 1
 size = 800
 # size of the chain
-rw_kval = 40.0
-rw_cutoff = 3.5
+rw_kval = 30
+rw_cutoff = 1.5
 rw_epsilon = 1.0
-rw_sigma = 0.4
-
+rw_sigma = 1.0
 
 # block = 100
-copolymer = []
-for i in range(40):
-    copolymer.append('a')
-for i in range(720):
-    copolymer.append('b')
-for i in range(40):
-    copolymer.append('a')
 
-random_copolymer = []
+copolymer = []
+for i in range(400):
+    copolymer.append('a')
+for i in range(400):
+    copolymer.append('b')
 
 total_time = 0
 for i in range(num_walks):
@@ -57,8 +55,10 @@ for i in range(num_walks):
                     rw_epsilon,
                     rw_sigma,
                     bead_sequence = copolymer,
-                    allowed_failures= 1000000,
-                    termination="retract")
+                    initial_failures= 10000,
+                    walk_failures = 10000,
+                    soften=True,
+                    termination="soften")
     t1 = time.time()
     total_time+= t1-t0
     print(f"Walk {i} completed in {t1-t0} seconds. Total time elapsed: {total_time}")
@@ -67,35 +67,42 @@ for i in range(num_walks):
 total_time+= t1-t0
 print(f"Walks complete. Total time: {total_time} seconds")
 
-# vector that controls nature of deformation.
-strain = [-1e-2, -1e-2, -1e-2]
-#         xx    yy    zz   xy  yz  yz
-# box.simulation.deform(10000, timestep, strain, 0.3, reset=False, description=desc3)
 t0 = time.time()
 box.simulation.structure("test_structure.in")
 t1 = time.time()
 total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
 
-box.simulation.settings("test_settings.in") 
+box.simulation.settings("test_settings.in", nskin=2.0) 
 desc1 = "testing"
 
 timestep = 1e-3
-box.simulation.equilibrate(50000,
+# equilibrate the system to iron out the minima
+box.simulation.equilibrate(15000,
                            timestep,
-                           0.05,
+                           1.0,
                            'langevin',
                            output_steps=100,
                            description=desc1,
-                           dump=1000)
+                           dump=dmp)
 
-strain = [-2e-2, -2e-2, -2e-2]
-# box.simulation.deform(10000, timestep, strain, 0.1, reset=False, description=desc1)
+# Total wall time: 0:00:56
+# box.simulation.run(folder=simname)
 
-view_path = "~/ovito/build/bin/ovito"
+# Total wall time: 0:00:15
+# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=8)
 
-# box.simulation.view(view_path, "test_structure.in")
+# Total wall time: 0:00:09
+# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=16)
 
-# add mpi=7 argument to run with mpi
-box.simulation.run(folder="big_copolymer", mpi=7)
+# Total wall time: 0:00:08
+# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=20)
 
+# Total wall time: 0:00:08
+box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=21)
+
+# Total wall time: 0:00:09
+# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=24)
+
+# Total wall time: 0:00:12
+# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=32)

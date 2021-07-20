@@ -1,6 +1,6 @@
-# Program Name: walks_example.py
+# Program Name: equilibration_test.py 
 # Author: Aravinthen Rajkumar
-# Description: nanopoly configuration that just runs the random walks
+# Description: How long do I need to equilibrate?
 
 import numpy as np
 import time
@@ -12,43 +12,40 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 100.0
+box_size = 200.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=80)
+box = PolyLattice(box_size, cellnums=100)
 t1 = time.time()
 
-simname = "big_test"
-dmp = 100
+simname = "long_equilibrium_test"
+dmp = 1000
 print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t0}")
 
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
                          (1.0, 1.0, 1.5))
 
-box.interactions.newType("b", 0.5,
-                         (0.5, 0.5, 1.5),
-                         ('a,b', (0.3, 0.2, 1.5)))
+box.interactions.newType("b", 1.01,
+                         (1.0, 0.5, 1.5),
+                         ('a,b', (1.0, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
-
-num_walks = 100
+num_walks = 600
 size = 800
-# size of the chain
 rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
 rw_sigma = 1.0
 
-
 # block = 100
+
 copolymer = []
-for i in range(1500):
+for i in range(40):
     copolymer.append('a')
-for i in range(1500):
+for i in range(720):
     copolymer.append('b')
-
-
-random_copolymer = []
+for i in range(40):
+    copolymer.append('a')
 
 total_time = 0
 for i in range(num_walks):
@@ -60,7 +57,7 @@ for i in range(num_walks):
                     rw_sigma,
                     bead_sequence = copolymer,
                     initial_failures= 10000,
-                    walk_failures = 1000,
+                    walk_failures = 10000,
                     soften=True,
                     termination="soften")
     t1 = time.time()
@@ -77,11 +74,12 @@ t1 = time.time()
 total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
 
-box.simulation.settings("test_settings.in") 
+box.simulation.settings("test_settings.in", nskin=2.0) 
 desc1 = "testing"
 
 timestep = 1e-3
-box.simulation.equilibrate(5000,
+# equilibrate the system to iron out the minima
+box.simulation.equilibrate(15000,
                            timestep,
                            1.0,
                            'langevin',
@@ -89,44 +87,35 @@ box.simulation.equilibrate(5000,
                            description=desc1,
                            dump=dmp)
 
+# compress the system
 strain1 = [-2e-2, -2e-2, -2e-2]
-# strain2 = [1e-1, 1e-1, 0]
-# strain3 = [0, 0, 1]
-
-box.simulation.deform(50000, 
+box.simulation.deform(9000, 
                       timestep,
                       strain1,
-                      0.5,
+                      1.0,
                       reset=False,
                       dump=dmp,
+                      datafile=False,
                       description=desc1)
 
-# box.simulation.equilibrate(5000,
-#                            timestep,
-#                            0.1,
-#                            'nose-hoover',
-#                            output_steps=100,
-#                            description=desc1,
-#                            reset=False,
-#                            dump=dmp)
-# box.simulation.deform(2500, 
-#                       timestep,
-#                       strain2,
-#                       0.1,
-#                       reset=False,
-#                       dump=dmp,
-#                       description=desc1)
+# equilibrate the system at a higher temperature.
+# this allows reptation to take place and further entangle the system
+box.simulation.equilibrate(1000000,
+                           timestep,
+                           2.0,
+                           'langevin',
+                           output_steps=100,
+                           description=desc1,
+                           dump=dmp)
 
-# box.simulation.deform(500, 
-#                       timestep,
-#                       strain3,
-#                       0.1,
-#                       reset=False,
-#                       dump=dmp,
-#                       description=desc1)
+# cool the system to below the glass transition temperature
+box.simulation.equilibrate(3000000,
+                           timestep,
+                           0.29,
+                           'langevin',
+                           output_steps=100,
+                           description=desc1,
+                           dump=dmp)
 
-view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure.in")
-
-# # add mpi=7 argument to run with mpi
-# box.simulation.run(folder=simname)
+# # add mpi=8 argument to run with mpi
+box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=21)
