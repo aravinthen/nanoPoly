@@ -394,8 +394,11 @@ class PolyLattice:
             print(f"{t1-t0}")
             return [i[1] for i in densities][0:quals]
 
-                            
-    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, starting_pos=None, soften=True, termination=None, initial_failures=10000, walk_failures=10000):
+
+    
+    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,
+                    style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
+                    soften=True, phase_separate=False, termination=None, initial_failures=10000, walk_failures=10000):
         """
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -503,6 +506,17 @@ class PolyLattice:
         for i in bead_sequence:
             if i not in self.interactions.used_types:
                 self.interactions.used_types.append(i)
+
+        #-------------------------------------------------------------------------------------
+        #-------------------------------------------------------------------------------------
+        #-------------------------------------------------------------------------------------
+        # PHASE SEPARATION WEIGHTING CALCULATION FOR INITIAL POSITION
+        
+        if phase_separate == True:
+            pass
+        #-------------------------------------------------------------------------------------
+        #-------------------------------------------------------------------------------------
+        #-------------------------------------------------------------------------------------
 
         if starting_pos != None:
             starting_pos = np.array(starting_pos)
@@ -617,7 +631,7 @@ class PolyLattice:
                          self.num_beads,
                          starting_pos]
 
-            self.num_beads+=1
+            self.num_beads += 1
             self.num_walk_beads += 1 # the individual count beads that make up a walk
             self.index(current_cell).beads.append(bead_data)
 
@@ -653,6 +667,7 @@ class PolyLattice:
                 issues = 0
                 index_c = self.which_cell(current_pos)
                 # neighbor checking takes place here.
+                energy = 0.0 # used for phase separation
                 for j in neighbours:            
                     index_n = self.which_cell(j[-1])
                     
@@ -670,11 +685,25 @@ class PolyLattice:
                         issues += 1
                         break
 
+                    # this is used if phase_separation is True, otherwise it is ignored
+                    energy+=(self.interactions.return_energy(bead_type, j[2]))/distance**3
+                    
                 if issues > 0:      
                     too_close = True
                     current_pos = previous
                 else:
-                    too_close = False
+                    if phase_separate == True:
+                        # generate a random number w.r.t energy weight
+                        randnum = random.uniform(0,1)
+                        if randnum > m.exp(-energy):
+                            too_close = False
+#                            print(f"accepted!, {i} {randnum}, {m.exp(-energy)}, {energy}")
+                        else:
+#                            print(f"rejected!, {i} {randnum}, {m.exp(-energy)}, {energy}")
+                            too_close = True
+                            current_pos = previous
+                    else:
+                        too_close = False
 
                 # This has to be here: the failure condition is False when generation_count = 0
                 generation_count += 1
@@ -770,7 +799,7 @@ class PolyLattice:
         self.random_walked = True
 
         self.walkinfo[ID] = self.num_walk_beads
-        return 1
+        return 1        
 
     def graft_chain(self, starting_bead, num_beads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, allowed_failures=10000):
         """

@@ -26,7 +26,7 @@ box.interactions.newType("a", 1.0,
                          (1.0, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (1.0, 1.0, 1.5),
+                         (1.0, 0.5, 1.5),
                          ('a,b', (1.0, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
