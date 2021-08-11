@@ -13,6 +13,8 @@ import numpy as np
 import math as m
 import time
 import random
+from scipy.stats import invgauss
+import matplotlib.pyplot as plt
 
 import sys
 sys.path.append(".")
@@ -394,11 +396,12 @@ class PolyLattice:
             print(f"{t1-t0}")
             return [i[1] for i in densities][0:quals]
 
-
     
-    def random_walk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,
-                    style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
-                    soften=True, phase_separate=False, termination=None, initial_failures=10000, walk_failures=10000):
+    def randomwalk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,        
+                   style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
+                   end_pos=None,
+                   soften=True, phase_separate=False,
+                   termination=None, initial_failures=10000, walk_failures=10000):
         """
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -427,7 +430,6 @@ class PolyLattice:
         ID = self.num_walks + 1
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
-
         
         def rand_distance(length, dimension):
             """
@@ -483,8 +485,48 @@ class PolyLattice:
                 if new_pos[i] > maxdis:
                     new_pos[i] = new_pos[i] - maxdis
                 
-            return new_pos        
+            return new_pos
 
+        def forced_new_position(end_pos, bead_number, total_beads,
+                                position, length, dimension, maxdis, phi=None, theta=None):
+            """ used to direct the random walk to the end position."""
+            
+            # calculate initial new position vector:            
+            new_pos = new_position(position, length, dimension, maxdis, phi, theta)
+
+            # calculate forcing direction
+            forcing_dir = end_pos - new_pos
+            full_distance = np.linalg.norm(forcing_dir)
+            forcing_vec = forcing_dir/full_distance
+
+            
+            forcing = []
+            if length*(total_beads-bead_number) <= full_distance:
+                forcing_mag = np.random.uniform(0.9, 1.0)
+                print(bead_number, forcing_mag)
+                forcing.append(forcing_mag)
+            else:
+                mean = full_distance/total_beads*length
+                forcing_mag = invgauss.rvs(mean)
+                print(bead_number, forcing_mag)
+                forcing.append(forcing_mag)
+
+            # print(mean, bead_number, forcing_mag[0])
+
+            # add and rescale the forced direction
+            new_pos = new_pos + forcing_mag*forcing_vec
+            new_pos = length*(new_pos-position)/np.linalg.norm(new_pos - position) + position
+
+            for i in range(len(new_pos)):
+                if new_pos[i] < 0:
+                    new_pos[i] = maxdis + new_pos[i]
+                if new_pos[i] > maxdis:
+                    new_pos[i] = new_pos[i] - maxdis
+            
+            return new_pos
+        
+        #-------------------------------------------------------------------------------------------
+        
         # bond type dictionary
         if self.bonds == None:
             self.bonds = {}
@@ -519,7 +561,16 @@ class PolyLattice:
         #-------------------------------------------------------------------------------------
 
         if starting_pos != None:
-            starting_pos = np.array(starting_pos)
+            maxdis = self.cellside*self.cellnums
+            for i in range(len(starting_pos)):
+                if starting_pos[i] < 0:
+                    starting_pos[i] = maxdis + starting_pos[i]
+                if starting_pos[i] > maxdis:
+                    starting_pos[i] = starting_pos[i] - maxdis
+                if starting_pos[i] == maxdis:
+                    starting_pos[i] = 0.9999*maxdis
+                
+            starting_pos = np.array(starting_pos)            
             index_c = self.which_cell(starting_pos)                    
             neighbours = self.check_surroundings(starting_pos)
             issues = 0
@@ -553,6 +604,7 @@ class PolyLattice:
                 
                 self.num_beads+=1
                 self.num_walk_beads += 1 # the individual count for the number of beads specific to a walk
+                print(starting_pos)
                 self.index(self.which_cell(starting_pos)).beads.append(bead_data)
 
         else:
@@ -638,7 +690,6 @@ class PolyLattice:
         mini = 1.12234 # resetting minimum
         
         # Begin loop here.
-        bead_number = 1
         bond = mini*sigma # the minimum of the LJ potential
         i = 1
         current_pos = starting_pos
@@ -657,12 +708,17 @@ class PolyLattice:
 
                 not_valid = True
                 while not_valid:
-                    trial_pos = new_position(current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
+                    if end_pos == None:
+                        trial_pos = new_position(current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
+                    else:
+                        trial_pos = forced_new_position(end_pos, i, numbeads, 
+                                                        current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
+                        
                     not_valid = self.index(self.which_cell(trial_pos)).forbidden
                     
                 previous = current_pos
                 current_pos = trial_pos
-
+                
                 neighbours = self.check_surroundings(current_pos)
                 issues = 0
                 index_c = self.which_cell(current_pos)
@@ -799,8 +855,11 @@ class PolyLattice:
         self.random_walked = True
 
         self.walkinfo[ID] = self.num_walk_beads
-        return 1        
+        return 1
 
+
+    
+    
     def graft_chain(self, starting_bead, num_beads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, style='fene', phi=None, theta=None, cell_num=None, allowed_failures=10000):
         """
         This method is used to grow extra beads at a particular point in a given chain.

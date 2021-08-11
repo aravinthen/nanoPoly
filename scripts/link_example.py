@@ -76,7 +76,7 @@ random_copolymer = []
 
 total_time = 0
 t0 = time.time()    
-box.random_walk(size,
+box.randomwalk(size,
                 rw_kval,
                 rw_cutoff,
                 rw_epsilon,
@@ -89,7 +89,7 @@ print(f"Walk completed in {t1-t0} seconds")
 
 t0 = time.time()
 
-box.random_walk(size,
+box.randomwalk(size,
                 0.9*rw_kval,
                 rw_cutoff,
                 rw_epsilon,
@@ -111,7 +111,7 @@ box.bonded_crosslinks('d', # typeid
                       selflinking=5)
 
 
-# box.random_walk(size,
+# box.randomwalk(size,
 #                 rw_kval,
 #                 rw_cutoff,
 #                 rw_epsilon,
@@ -120,7 +120,7 @@ box.bonded_crosslinks('d', # typeid
 #                 restart=True,
 #                 termination="retract")
 
-# box.random_walk(size,
+# box.randomwalk(size,
 #                 rw_kval,
 #                 rw_cutoff,
 #                 rw_epsilon,

@@ -58,7 +58,7 @@ random_copolymer = []
 total_time = 0
 for i in range(2):
     t0 = time.time()
-    box.random_walk(size,
+    box.randomwalk(size,
                     rw_kval,
                     rw_cutoff,
                     rw_epsilon,
@@ -77,7 +77,7 @@ for i in range(2):
     print(low_density)
     low_density_cell = low_density[0]
     t0 = time.time()
-    box.random_walk(size,
+    box.randomwalk(size,
                     rw_kval,
                     rw_cutoff,
                     rw_epsilon,

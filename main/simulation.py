@@ -181,7 +181,7 @@ Bonds                                                                           
 
 #-----------------------------------------------------------------------------------------------------
 
-    def settings(self, filename=None, nlist=[10,1000], dielectric=False):
+    def settings(self, filename=None, nlist=[10,1000], nskin=1.0, dielectric=False):
         """ 
         NOTE: This comes SECOND in the simulation order of precedence!
               Will flag an error if sim_structure hasn't run first.
@@ -266,7 +266,7 @@ read_data          ${{structure}}                                               
                                                    
         f.write(f"\n\
 # define interactions                                                                 \n\
-neighbor      1.0 multi                                                               \n\
+neighbor      {nskin} multi                                                           \n\
 neigh_modify  every {nlist[0]} one {nlist[1]}                                         \n\
 ")
 

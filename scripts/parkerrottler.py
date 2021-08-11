@@ -51,7 +51,7 @@ for i in range(40):
 total_time = 0
 for i in range(num_walks):
     t0 = time.time()
-    box.random_walk(size,
+    box.randomwalk(size,
                     rw_kval,
                     rw_cutoff,
                     rw_epsilon,

@@ -47,7 +47,7 @@ graft_num = 1
 total_time = 0
 t0 = time.time()
 
-box.random_walk(size,
+box.randomwalk(size,
                 rw_kval,
                 rw_cutoff,
                 rw_epsilon,
@@ -73,7 +73,7 @@ t1 = time.time()
 total_time+= t1-t0
 print(f"Walk completed in {t1-t0} seconds")
 
-# box.random_walk(size,
+# box.randomwalk(size,
 #                 rw_kval,
 #                 rw_cutoff,
 #                 rw_epsilon,
@@ -82,7 +82,7 @@ print(f"Walk completed in {t1-t0} seconds")
 #                 restart=True,
 #                 termination="retract")
 
-# box.random_walk(size,
+# box.randomwalk(size,
 #                 rw_kval,
 #                 rw_cutoff,
 #                 rw_epsilon,
