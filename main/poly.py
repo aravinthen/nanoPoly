@@ -13,7 +13,6 @@ import numpy as np
 import math as m
 import time
 import random
-from scipy.stats import invgauss
 import matplotlib.pyplot as plt
 
 import sys
@@ -56,6 +55,11 @@ class PolyLattice:
             
             # if the cell, for any reason, is not allowed to have beads or crosslinkers inside.
             self.forbidden = False
+
+            # a list of densities per bead.
+            # These must be calculated via self-consistent field theory.
+            self.densities = []
+            
             # only one crosslinker allowed in every cell.        
             self.cl_pos = None
             # multiple beads allowed in a cell.
@@ -97,8 +101,9 @@ class PolyLattice:
                 
                 self.sigma_matrix = np.array([potential[0]])
                 self.energy_matrix = np.array([potential[1]])
-                self.cutoff_matrix = np.array([potential[2]])
-                self.num_types+=1                
+                self.cutoff_matrix = np.array([potential[2]])                
+                self.num_types+=1
+                
             else:
                 self.types[type_id] = mass
                 self.typekeys[type_id] = self.num_types+1
@@ -216,7 +221,7 @@ class PolyLattice:
                                           # encapsulates boundary conditions
 
 
-        # initializing the interactions class
+        # initializing the interactions class and density class
         self.interactions = self.Interactions(self.cellside)
 
         # attached libraries
@@ -243,7 +248,8 @@ class PolyLattice:
         self.uclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
         self.bclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
 
-        
+
+        self.density = None
         self.nanostructure = None
         
         # counts
@@ -346,61 +352,41 @@ class PolyLattice:
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
 
 
-    def find_low_density(self, region=0, quals=1):
-        """
-        Used to find the regions of the box with the lowest densities.
-        Only to be employed when the box is VERY dense!
-        Region: the region over which partial densities of the box are calculated.
-        quals: the number of cells allowed to qualify
-        """
-        low_density = 1
-        low_dense_cells = []
-        t0 = time.time()
-        for i in range(self.cellnums):
-            for j in range(self.cellnums):
-                for k in range(self.cellnums):
-                    cell = self.index([i,j,k])
-                    density = len(cell.beads)/self.num_beads
-                    if density < low_density:
-                        low_density = density
-                        low_dense_cells = [[i,j,k]]
-                    if density == low_density:
-                        low_dense_cells.append([i,j,k])
+    def density_file(self, density_file):
+        if self.interactions.num_types == 0:
+            raise EnvironmentError("Types must be defined before setting densities.")
 
-        t1 = time.time()
-        print(f"{t1-t0}")
-        
-        if region == 0:
-            return low_dense_cells
-        else:
-            t0 = time.time()
-            densities = []
-            for cell_ind in low_dense_cells:
-                # find all cells adjacent by the region unit
-                bead_count = 0
-                for i in range(-region,region+1):
-                    for j in range(-region,region+1):
-                        for k in range(-region,region+1):
-                            region_index = [(cell_ind[0]+i)%self.cellnums,
-                                              (cell_ind[1]+j)%self.cellnums,
-                                              (cell_ind[2]+k)%self.cellnums]
+        count=0
+        with open(density_file, 'r') as f:
+            # check if the number of beads in file match with the number of beads in interaction data
+            file_beads = len(f.readline().strip().split("\t")[3:])
 
-                            region_cell = self.index(region_index)                            
-                            bead_count+=len(region_cell.beads)
-                            
-                densities.append((bead_count/self.num_beads, region_index))
+            if file_beads != self.interactions.num_types:                
+                raise EnvironmentError("Defined bead types and file bead types do not match.")
 
-            # qualifiers
-            densities.sort(key=lambda x: x[0])
-            t1 = time.time()
-            print(f"{t1-t0}")
-            return [i[1] for i in densities][0:quals]
+            
+        with open(density_file, 'r') as f:
+            for line in f:
+                count+=1
+                datum = line.strip().split("\t")
+                cell = [int(datum[i]) for i in range(0,3)]
+                density_data = [float(datum[i]) for i in range(3,len(datum))]
 
+                if any(i < 0.0 for i in density_data):
+                    raise EnvironmentError("Unphysical densities contained with density file.")
+
+                self.index(cell).densities = density_data
+                
+        print(f"{count} density values read into box.")
+
+        self.density == True
+            
     
     def randomwalk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,        
                    style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
+                   mc=False,
                    end_pos=None,
-                   soften=True, phase_separate=False,
+                   soften=True,
                    termination=None, initial_failures=10000, walk_failures=10000):
         """
         Produces a random walk.
@@ -498,18 +484,26 @@ class PolyLattice:
             forcing_dir = end_pos - new_pos
             full_distance = np.linalg.norm(forcing_dir)
             forcing_vec = forcing_dir/full_distance
-
             
-            forcing = []
-            if length*(total_beads-bead_number) <= full_distance:
-                forcing_mag = np.random.uniform(0.9, 1.0)
-                print(bead_number, forcing_mag)
-                forcing.append(forcing_mag)
-            else:
-                mean = full_distance/total_beads*length
-                forcing_mag = invgauss.rvs(mean)
-                print(bead_number, forcing_mag)
-                forcing.append(forcing_mag)
+            # forcing = []
+            # if length*(total_beads-bead_number) <= full_distance:
+            #     forcing_mag = np.random.uniform(0.9, 1.0)
+            #     print(bead_number, forcing_mag)
+            #     forcing.append(forcing_mag)
+            # else:
+            measure = full_distance/((total_beads-bead_number)*length)
+            mean = (2**7)*(measure - 0.5)**7            
+            sigma = 1.0
+            
+            forcing_mag = np.random.normal(mean)
+            if (measure > 0.2) and (measure < 0.8):
+                forcing_mag += 0.5
+                print("bing!")
+                
+            print(measure, mean, forcing_mag)
+                
+#            print(bead_number, forcing_mag)
+#            forcing.append(forcing_mag)
 
             # print(mean, bead_number, forcing_mag[0])
 
@@ -549,17 +543,6 @@ class PolyLattice:
             if i not in self.interactions.used_types:
                 self.interactions.used_types.append(i)
 
-        #-------------------------------------------------------------------------------------
-        #-------------------------------------------------------------------------------------
-        #-------------------------------------------------------------------------------------
-        # PHASE SEPARATION WEIGHTING CALCULATION FOR INITIAL POSITION
-        
-        if phase_separate == True:
-            pass
-        #-------------------------------------------------------------------------------------
-        #-------------------------------------------------------------------------------------
-        #-------------------------------------------------------------------------------------
-
         if starting_pos != None:
             maxdis = self.cellside*self.cellnums
             for i in range(len(starting_pos)):
@@ -588,6 +571,13 @@ class PolyLattice:
                 if distance < mini*self.interactions.return_sigma(bead_sequence[0], j[2]):
                     issues+=1
                     break # stop checking neighbours
+            # monte carlo check
+
+            if mc == True:
+                random_num = np.random.uniform(0,1)
+                density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
+                if random_num > density:
+                    issues+=1
                 
             if issues>0:
                 print("Provided starting position is too close to another bead.")
@@ -595,6 +585,7 @@ class PolyLattice:
                 raise Exception("Program terminated.")
 
             else:
+
                 bead_data = [ID,
                              0,
                              bead_sequence[0],
@@ -647,6 +638,13 @@ class PolyLattice:
                     if distance < mini*self.interactions.return_sigma(bead_sequence[0], j[2]):
                         issues+=1
                         break # stop checking neighbours
+                    
+                # monte carlo check
+                if mc == True:
+                    random_num = np.random.uniform(0,1)
+                    density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
+                    if random_num > density:
+                        issues+=1
 
                 if issues > 0:                    
                     invalid_start = True
@@ -723,7 +721,6 @@ class PolyLattice:
                 issues = 0
                 index_c = self.which_cell(current_pos)
                 # neighbor checking takes place here.
-                energy = 0.0 # used for phase separation
                 for j in neighbours:            
                     index_n = self.which_cell(j[-1])
                     
@@ -740,26 +737,20 @@ class PolyLattice:
                     if distance < sigma:                        
                         issues += 1
                         break
-
-                    # this is used if phase_separation is True, otherwise it is ignored
-                    energy+=(self.interactions.return_energy(bead_type, j[2]))/distance**3
+                    
+                # monte carlo check
+                if mc == True:
+                    random_num = np.random.uniform(0,1)
+#                    print(index_c, bead_type, self.index(index_c).densities)
+                    density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                    if random_num > density:
+                        issues+=1
                     
                 if issues > 0:      
                     too_close = True
                     current_pos = previous
                 else:
-                    if phase_separate == True:
-                        # generate a random number w.r.t energy weight
-                        randnum = random.uniform(0,1)
-                        if randnum > m.exp(-energy):
-                            too_close = False
-#                            print(f"accepted!, {i} {randnum}, {m.exp(-energy)}, {energy}")
-                        else:
-#                            print(f"rejected!, {i} {randnum}, {m.exp(-energy)}, {energy}")
-                            too_close = True
-                            current_pos = previous
-                    else:
-                        too_close = False
+                    too_close = False
 
                 # This has to be here: the failure condition is False when generation_count = 0
                 generation_count += 1
@@ -987,6 +978,12 @@ class PolyLattice:
                 if distance < sigma:                        
                     issues += 1
                     break
+
+            # monte carlo check
+            random_num = np.random.uniform(0,1)
+            density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
+            if random_num > density:
+                issues+=1
 
             if issues > 0:      
                 too_close = True
@@ -1509,6 +1506,56 @@ ed.
                             
             print("Data dump successful.")
             return 0
+
+    def find_low_density(self, region=0, quals=1):
+        """
+        Used to find the regions of the box with the lowest densities.
+        Only to be employed when the box is VERY dense!
+        Region: the region over which partial densities of the box are calculated.
+        quals: the number of cells allowed to qualify
+        """
+        low_density = 1
+        low_dense_cells = []
+        t0 = time.time()
+        for i in range(self.cellnums):
+            for j in range(self.cellnums):
+                for k in range(self.cellnums):
+                    cell = self.index([i,j,k])
+                    density = len(cell.beads)/self.num_beads
+                    if density < low_density:
+                        low_density = density
+                        low_dense_cells = [[i,j,k]]
+                    if density == low_density:
+                        low_dense_cells.append([i,j,k])
+
+        t1 = time.time()
+        print(f"{t1-t0}")
+        
+        if region == 0:
+            return low_dense_cells
+        else:
+            t0 = time.time()
+            densities = []
+            for cell_ind in low_dense_cells:
+                # find all cells adjacent by the region unit
+                bead_count = 0
+                for i in range(-region,region+1):
+                    for j in range(-region,region+1):
+                        for k in range(-region,region+1):
+                            region_index = [(cell_ind[0]+i)%self.cellnums,
+                                              (cell_ind[1]+j)%self.cellnums,
+                                              (cell_ind[2]+k)%self.cellnums]
+
+                            region_cell = self.index(region_index)                            
+                            bead_count+=len(region_cell.beads)
+                            
+                densities.append((bead_count/self.num_beads, region_index))
+
+            # qualifiers
+            densities.sort(key=lambda x: x[0])
+            t1 = time.time()
+            print(f"{t1-t0}")
+            return [i[1] for i in densities][0:quals]
 
     def file_read(self, filename):
         """ Used to read external data into the box."""

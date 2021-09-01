@@ -31,6 +31,8 @@ class Simulation:
         self.global_dump = 0 # used to move dump files into a folder
         self.data_production = 0
 
+        self.pending_mods = []
+
         self.set_settings = False
 
         # variable below is set True when the types dictionary has been ennumerated.
@@ -48,6 +50,163 @@ class Simulation:
         if walk[0:2] == "uc":
             return self.polylattice.num_walk_beads + self.polylattice.num_bclbeads + self.polylattice.uclinfo[int(bead[0][2::])-1]+bead[1]
 
+
+    def modify_interaction(self, type1, type2,
+                           new_sigma = None, new_energy = None, new_cutoff = None):
+        """
+        This function will be used to change the properties of the beads during simulation.
+        identifier - the interaction that has to be changed, must be in string format       
+        new_sigma, new_energy, new_cutoff - self explanatory
+        """
+
+        if new_sigma == None and new_energy == None and new_cutoff == None:
+            raise EnvironmentError("No changes are specified.")
+
+        for mod in self.pending_mods:
+            if (type1, type2) == (mod[0], mod[1]):
+                raise EnvironmentError("Multiple modifications are being made to the same interaction.")
+
+        # retrieve the initial interaction        
+        current_vals = [self.polylattice.interactions.return_sigma(type1, type2),
+                        self.polylattice.interactions.return_energy(type1, type2),
+                        self.polylattice.interactions.return_cutoff(type1, type2)]        
+    
+        new_vals = [new_sigma, new_energy, new_cutoff]
+
+        for i in range(3):
+            if new_vals[i] == None:
+                new_vals[i] = current_vals[i]
+
+        self.pending_mods.append([type1, type2, current_vals, new_vals])
+        
+
+    def run_modifications(self, total_steps, spacing,
+                          temp, timestep, final_temp=None, tdamp=None, pdamp=None, drag=2.0,
+                          data=('step','temp','press'), output_steps=100,
+                          dump=0, seed = random.randrange(0,99999), description=None):
+        """
+        Runs all of the changes stored up in the 'bead_mod' list.
+        steps - total number of steps in which the interaction will be changed,
+        spacing - number of steps per interval
+        """
+        if len(self.pending_mods) == 0:
+            raise EnvironmentError("No modifications have been specified.")
+
+        if final_temp==None:            
+            final_temp=temp
+            
+        if tdamp==None:
+            tdamp=100*timestep
+            
+        if pdamp==None:
+            pdamp=1000*timestep
+
+        if not self.set_settings:
+            self.equibs-=1
+            raise Exception("Settings have not yet been defined.")
+
+        data_string = " ".join(data)
+
+        f = open(self.file_name, 'a')
+
+        f.write(f"\n\
+#---------------------------------------------------------------------------------------------------\n\
+# POTENTIAL MODIFICATION STAGE                                                                 \n")
+                
+        if description != None:
+            f.write("# Description: {description}\n")
+
+        f.write("\
+#---------------------------------------------------------------------------------------------------\n\
+")
+
+        diffs = []
+        for i in self.pending_mods:
+            changes = []
+            for j in range(3):
+                changes.append(spacing*(i[-1][j] - i[-2][j])/total_steps)
+            diffs.append(changes)
+
+        for i in range(total_steps//spacing):
+            for j in range(len(self.pending_mods)):
+                for k in range(3):
+                    self.pending_mods[j][-2][k] = self.pending_mods[j][-2][k] + diffs[j][k]
+                num1 = self.polylattice.interactions.typekeys[self.pending_mods[j][0]]
+                num2 = self.polylattice.interactions.typekeys[self.pending_mods[j][1]]
+                    
+                sigma = self.pending_mods[j][-2][0]
+                energy = self.pending_mods[j][-2][1]
+                cutoff = self.pending_mods[j][-2][2]
+                f.write(f"\
+pair_style    lj/cut {cutoff}                                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
+")
+                    
+            if dump>0:
+                self.global_dump = 1
+                self.dumping = 1
+                f.write(f"\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
+")
+            f.write(f"\
+fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
+fix             2 all momentum 1 linear 1 1 1\n\
+thermo_style    custom {data_string} \n\
+thermo          {output_steps}\n\
+run             {spacing} \n\
+unfix 1         \n\
+unfix 2         \n\
+")
+            if self.dumping == 1:
+                self.dumping = 0
+                f.write(f"\
+undump 1        \n\
+")
+            f.write(f"\n")
+
+
+        if (total_steps % spacing != 0):
+            remaining_steps = total_steps % spacing
+            for j in range(len(self.pending_mods)):            
+                num1 = self.polylattice.interactions.typekeys[self.pending_mods[j][0]]
+                num2 = self.polylattice.interactions.typekeys[self.pending_mods[j][1]]                
+                sigma = self.pending_mods[j][-1][0]
+                energy = self.pending_mods[j][-1][1]
+                cutoff = self.pending_mods[j][-1][2]
+                
+                f.write(f"\
+pair_style    lj/cut {cutoff}                                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
+")
+            
+            if dump>0:
+                self.global_dump = 1
+                self.dumping = 1
+                f.write(f"\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
+")
+            f.write(f"\
+fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
+fix             2 all momentum 1 linear 1 1 1\n\
+thermo_style    custom {data_string} \n\
+thermo          {output_steps}\n\
+run             {remaining_steps} \n\
+unfix 1         \n\
+unfix 2         \n\
+")
+            if self.dumping == 1:
+                self.dumping = 0
+                f.write(f"\
+undump 1        \n\
+")
+            f.write(f"\n")
+
+
+        self.pending_mods = 0
+        ## STILL TO DO:
+        # resignment of modified values
+
+            
         
     def structure(self, datafile=None):
         """
@@ -311,7 +470,8 @@ compute         1 all stress/atom NULL \n\
 
         f.close()
 
-    def equilibrate(self, steps, timestep, temp, dynamics, bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=False, description=None):
+    def equilibrate(self, steps, timestep, temp, dynamics,
+                    bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=False, description=None):
         """
         ARGUMENTS:
         steps      - the number of steps taken in the equilibration
