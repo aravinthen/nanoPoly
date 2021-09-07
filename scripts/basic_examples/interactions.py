@@ -18,14 +18,18 @@ def print_type():
     print(box.interactions.sigma_matrix)
     print(box.interactions.energy_matrix)
     print(box.interactions.cutoff_matrix)
-
+    print(box.interactions.n_matrix)
+    print(box.interactions.alpha_matrix)
+    print(box.interactions.lmbda_matrix)
+    
 box.interactions.newType("mainbead", 0.5,
-                         (1, 0.2, 1.3))
+                         (1, 0.2, 1.3, (3, 0.8, 0.9)))
 
 box.interactions.newType("subbead", 1.0,
                          (1, 0.5, 1.3),
-                         ('mainbead,subbead', (1.1, 0.2, 0.1)))
+                         ('mainbead,subbead', (1.1, 0.2, 0.1, (3, 0.2, 0.2))))
 
+print_type()
 # -------------------------------------------------------------------------
 # Running random walk
 # -------------------------------------------------------------------------
@@ -48,11 +52,11 @@ box.randomwalk(30,
 box.simulation.structure("int_structure.in")
 box.simulation.settings("int_settings.in", nskin=2.0) 
 
-# -------------------------------------------------------------------------
-# Modifying interactions mid simulation
-# -------------------------------------------------------------------------
+# # -------------------------------------------------------------------------
+# # Modifying interactions mid simulation
+# # -------------------------------------------------------------------------
 box.simulation.modify_interaction('mainbead', 'subbead',
-                                  new_sigma=1.3, new_cutoff=2)
+                                  new_sigma=1.3, new_cutoff=2, new_lambda=0.9)
 
 box.simulation.modify_interaction('mainbead', 'mainbead',
                                   new_energy=3, new_cutoff=2)
@@ -63,5 +67,5 @@ for i in box.simulation.pending_mods:
 
 box.simulation.run_modifications(1000, 134, 1, 0.1)
 
-# view_path = "~/ovito/build/bin/ovito"
-# box.simulation.view(view_path, "int_structure.in")
+# # view_path = "~/ovito/build/bin/ovito"
+# # box.simulation.view(view_path, "int_structure.in")

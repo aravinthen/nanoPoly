@@ -71,9 +71,17 @@ class PolyLattice:
             self.types = {}
             self.typekeys = {}
             self.type_matrix = None
+            
             self.sigma_matrix = None   # distances between types
             self.energy_matrix = None  # interaction energies between types
             self.cutoff_matrix = None  # cutoff between types
+            
+            # next parameters only to be used in the case of SOFT POTENTIALS            
+            self.n_matrix = None   
+            self.alpha_matrix = None  
+            self.lmbda_matrix = None  
+            
+            
             self.used_types = []        # the types that are actually used in the simulation
             self.max_dist = max_dist
             self.num_types = 0 # the number of types present in the box
@@ -101,7 +109,12 @@ class PolyLattice:
                 
                 self.sigma_matrix = np.array([potential[0]])
                 self.energy_matrix = np.array([potential[1]])
-                self.cutoff_matrix = np.array([potential[2]])                
+                self.cutoff_matrix = np.array([potential[2]])
+
+                self.n_matrix = np.array([potential[3][0]])
+                self.alpha_matrix = np.array([potential[3][1]])
+                self.lmbda_matrix = np.array([potential[3][2]])
+                
                 self.num_types+=1
                 
             else:
@@ -123,7 +136,7 @@ class PolyLattice:
                             
                 # modify the sigma matrix
                 sigma_matrix = self.sigma_matrix
-                ##  build new columns and rows onto the energy matrix
+                ##  build new columns and rows onto the sigma matrix
                 sigma_matrix = np.column_stack((sigma_matrix,
                                                 np.array([0 for i in range(self.num_types-1)])))
                 sigma_matrix = np.vstack((sigma_matrix,
@@ -147,7 +160,7 @@ class PolyLattice:
                 
                 # modify the cutoff matrix
                 cutoff_matrix = self.cutoff_matrix
-                ##  build new columns and rows onto the energy matrix
+                ##  build new columns and rows onto the cutoff matrix
                 cutoff_matrix = np.column_stack((cutoff_matrix,
                                                 np.array([0 for i in range(self.num_types-1)])))
                 cutoff_matrix = np.vstack((cutoff_matrix,
@@ -155,6 +168,50 @@ class PolyLattice:
                 # assign cutoff 
                 cutoff_matrix[self.num_types-1,self.num_types-1] = potential[2]                
                 self.cutoff_matrix = cutoff_matrix
+
+                # -----------------------------------------------------------------------
+                
+                if len(potential) > 3:
+                    soft_potential = potential[3]
+                else:
+                    soft_potential = (0, 0, 1) # n, alpha, lmbda
+                    
+                # modify the n matrix
+                n_matrix = self.n_matrix
+                # build new columns and rows onto the n matrix
+                n_matrix = np.column_stack((n_matrix,
+                                            np.array([0 for i in range(self.num_types-1)])))
+                n_matrix = np.vstack((n_matrix,
+                                      np.array([0 for i in range(self.num_types)])))
+                
+                # assign n 
+                n_matrix[self.num_types-1,self.num_types-1] = soft_potential[0]                
+                self.n_matrix = n_matrix
+                
+                # modify the alpha matrix
+                alpha_matrix = self.alpha_matrix
+                # build new columns and rows onto the n matrix
+                alpha_matrix = np.column_stack((alpha_matrix,
+                                            np.array([0 for i in range(self.num_types-1)])))
+                alpha_matrix = np.vstack((alpha_matrix,
+                                      np.array([0 for i in range(self.num_types)])))
+                
+                # assign n 
+                alpha_matrix[self.num_types-1,self.num_types-1] = soft_potential[1]                
+                self.alpha_matrix = alpha_matrix
+
+                # modify the lmbda matrix
+                lmbda_matrix = self.lmbda_matrix
+                # build new columns and rows onto the n matrix
+                lmbda_matrix = np.column_stack((lmbda_matrix,
+                                            np.array([0 for i in range(self.num_types-1)])))
+                lmbda_matrix = np.vstack((lmbda_matrix,
+                                      np.array([0 for i in range(self.num_types)])))
+                
+                # assign n 
+                lmbda_matrix[self.num_types-1,self.num_types-1] = soft_potential[2]                
+                self.lmbda_matrix = lmbda_matrix
+
                 
                 #----------------------------------------------------------------------------------
                 # now deal with the interactions for different kinds of beads
@@ -186,6 +243,23 @@ class PolyLattice:
                     self.cutoff_matrix[ri[0], rj[0]] = properties[2]
                     self.cutoff_matrix[ni[0], nj[0]] = properties[2]
 
+
+                    if len(properties) > 3:
+                        soft_properties = properties[3]
+                    else:
+                        soft_properties = (0, 0, 1) # n, alpha, lmbda
+                        
+                    self.n_matrix[ri[0], rj[0]] = soft_properties[0]
+                    self.n_matrix[ni[0], nj[0]] = soft_properties[0]
+                    
+                    self.alpha_matrix[ri[0], rj[0]] = soft_properties[1]
+                    self.alpha_matrix[ni[0], nj[0]] = soft_properties[1]
+                    
+                    self.lmbda_matrix[ri[0], rj[0]] = soft_properties[2]
+                    self.lmbda_matrix[ni[0], nj[0]] = soft_properties[2]
+
+                    
+
         def return_sigma(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
@@ -203,6 +277,24 @@ class PolyLattice:
             namestring = f"{type1},{type2}"
             ni, nj = np.where(self.type_matrix == namestring)
             return self.cutoff_matrix[ni,nj][0]
+
+        def return_n(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.n_matrix[ni,nj][0]
+
+        def return_alpha(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.alpha_matrix[ni,nj][0]
+
+        def return_lambda(self, type1, type2):
+            # returns the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            return self.lmbda_matrix[ni,nj][0]
 
     def __init__(self, boxsize, cellnums=1.0):
         """        

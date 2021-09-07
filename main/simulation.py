@@ -52,14 +52,15 @@ class Simulation:
 
 
     def modify_interaction(self, type1, type2,
-                           new_sigma = None, new_energy = None, new_cutoff = None):
+                           new_sigma = None, new_energy = None, new_cutoff = None,
+                           new_n = None, new_alpha = None, new_lambda = None):
         """
         This function will be used to change the properties of the beads during simulation.
         identifier - the interaction that has to be changed, must be in string format       
         new_sigma, new_energy, new_cutoff - self explanatory
         """
 
-        if new_sigma == None and new_energy == None and new_cutoff == None:
+        if new_sigma == None and new_energy == None and new_cutoff == None and new_n == None and new_alpha == None and new_lambda == None:
             raise EnvironmentError("No changes are specified.")
 
         for mod in self.pending_mods:
@@ -69,11 +70,14 @@ class Simulation:
         # retrieve the initial interaction        
         current_vals = [self.polylattice.interactions.return_sigma(type1, type2),
                         self.polylattice.interactions.return_energy(type1, type2),
-                        self.polylattice.interactions.return_cutoff(type1, type2)]        
+                        self.polylattice.interactions.return_cutoff(type1, type2),
+                        self.polylattice.interactions.return_n(type1, type2),
+                        self.polylattice.interactions.return_alpha(type1, type2),
+                        self.polylattice.interactions.return_lambda(type1, type2)]        
     
-        new_vals = [new_sigma, new_energy, new_cutoff]
+        new_vals = [new_sigma, new_energy, new_cutoff, new_n, new_alpha, new_lambda]
 
-        for i in range(3):
+        for i in range(6):
             if new_vals[i] == None:
                 new_vals[i] = current_vals[i]
 
@@ -123,13 +127,13 @@ class Simulation:
         diffs = []
         for i in self.pending_mods:
             changes = []
-            for j in range(3):
+            for j in range(6):
                 changes.append(spacing*(i[-1][j] - i[-2][j])/total_steps)
             diffs.append(changes)
 
         for i in range(total_steps//spacing):
             for j in range(len(self.pending_mods)):
-                for k in range(3):
+                for k in range(6):
                     self.pending_mods[j][-2][k] = self.pending_mods[j][-2][k] + diffs[j][k]
                 num1 = self.polylattice.interactions.typekeys[self.pending_mods[j][0]]
                 num2 = self.polylattice.interactions.typekeys[self.pending_mods[j][1]]
@@ -137,10 +141,21 @@ class Simulation:
                 sigma = self.pending_mods[j][-2][0]
                 energy = self.pending_mods[j][-2][1]
                 cutoff = self.pending_mods[j][-2][2]
-                f.write(f"\
+                n = self.pending_mods[j][-2][3]
+                alpha = self.pending_mods[j][-2][4]
+                lmbda = self.pending_mods[j][-2][5]
+
+                if int(n) == 0 and int(alpha) == 0 and int(lmbda) == 1:
+                    f.write(f"\
 pair_style    lj/cut {cutoff}                                                         \n\
 pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
 ")
+                else:
+                    f.write(f"\
+pair_style    lj/cut/soft {n} {alpha} {cutoff}                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma} {lmbda}                         \n\
+")               
+
                     
             if dump>0:
                 self.global_dump = 1
@@ -471,7 +486,12 @@ compute         1 all stress/atom NULL \n\
         f.close()
 
     def equilibrate(self, steps, timestep, temp, dynamics,
-                    bonding=False, final_temp=None, damp=10.0, tdamp=None, pdamp=None, drag=2.0, output_steps=100, dump=0, data=('step','temp','press'), seed=random.randrange(0,99999), reset=False, description=None):
+                    bonding=False, final_temp=None,
+                    damp=10.0, tdamp=None, pdamp=None, drag=2.0,
+                    output_steps=100, dump=0, data=('step','temp','press'),
+                    seed=random.randrange(0,99999),
+                    rcf=False,
+                    reset=False, description=None):
         """
         ARGUMENTS:
         steps      - the number of steps taken in the equilibration
@@ -523,6 +543,9 @@ velocity        all create {float(temp)} 1231 \n\
 fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
 ")
+            if rcf == True:
+                print("Not implemented!")
+                
             if bonding == True:
                 if self.polylattice.cl_unbonded == False:
                     raise EnvironmentError("Unbonded crosslinks are not present in the Polylattice!\n")
