@@ -85,8 +85,10 @@ class Simulation:
         
 
     def run_modifications(self, total_steps, spacing,
-                          temp, timestep, final_temp=None, tdamp=None, pdamp=None, drag=2.0,
-                          data=('step','temp','press'), output_steps=100,
+                          temp, timestep, final_temp=None, 
+                          damp=10, tdamp=None, pdamp=None, drag=2.0,
+                          data=('step','temp','press', 'pe', 'ke'), output_steps=100,
+                          scale=False,
                           dump=0, seed = random.randrange(0,99999), description=None):
         """
         Runs all of the changes stored up in the 'bead_mod' list.
@@ -134,7 +136,8 @@ class Simulation:
         for i in range(total_steps//spacing):
             for j in range(len(self.pending_mods)):
                 for k in range(6):
-                    self.pending_mods[j][-2][k] = self.pending_mods[j][-2][k] + diffs[j][k]
+                    self.pending_mods[j][-2][k] = round(self.pending_mods[j][-2][k] + diffs[j][k], 5)
+
                 num1 = self.polylattice.interactions.typekeys[self.pending_mods[j][0]]
                 num2 = self.polylattice.interactions.typekeys[self.pending_mods[j][1]]
                     
@@ -163,9 +166,18 @@ pair_coeff    {num1} {num2} {round(energy,5)} {sigma} {lmbda}                   
                 f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
 ")
+            if scale:
+                f.write(f"\
+velocity        all scale {temp} \n")
+            else:
+                f.write(f"\
+velocity        all create {float(temp)} {seed} \n")
+
             f.write(f"\
-fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
-fix             2 all momentum 1 linear 1 1 1\n\
+fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
+fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
+")
+            f.write(f"\
 thermo_style    custom {data_string} \n\
 thermo          {output_steps}\n\
 run             {spacing} \n\
@@ -189,10 +201,10 @@ undump 1        \n\
                 energy = self.pending_mods[j][-1][1]
                 cutoff = self.pending_mods[j][-1][2]
                 
-                f.write(f"\
-pair_style    lj/cut {cutoff}                                                         \n\
-pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
-")
+            f.write(f"\
+pair_style    lj/cut/soft {n} {alpha} {cutoff}                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma} {lmbda}                         \n\
+")               
             
             if dump>0:
                 self.global_dump = 1
@@ -200,9 +212,20 @@ pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                           
                 f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
 ")
+
+            if scale:
+                f.write(f"\
+velocity        all scale {temp} \n")
+            else:
+                f.write(f"\
+velocity        all create {float(temp)} {seed} \n")
+
             f.write(f"\
-fix             1 all npt temp {float(temp)} {float(final_temp)} {tdamp} iso 0 0 {pdamp} drag {drag} \n\
-fix             2 all momentum 1 linear 1 1 1\n\
+fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
+fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
+")
+
+            f.write(f"\
 thermo_style    custom {data_string} \n\
 thermo          {output_steps}\n\
 run             {remaining_steps} \n\
@@ -215,11 +238,33 @@ unfix 2         \n\
 undump 1        \n\
 ")
             f.write(f"\n")
-
-
-        self.pending_mods = 0
-        ## STILL TO DO:
-        # resignment of modified values
+            
+            # resignment of modified values
+        for i in range(len(self.pending_mods)):
+            self.polylattice.interactions.modify_sigma(self.pending_mods[i][0], 
+                                                       self.pending_mods[i][1], 
+                                                       self.pending_mods[i][-1][0])
+            
+            self.polylattice.interactions.modify_energy(self.pending_mods[i][0], 
+                                                        self.pending_mods[i][1], 
+                                                        self.pending_mods[i][-1][1])
+            
+            self.polylattice.interactions.modify_cutoff(self.pending_mods[i][0], 
+                                                        self.pending_mods[i][1], 
+                                                        self.pending_mods[i][-1][2])
+                
+            self.polylattice.interactions.modify_n(self.pending_mods[i][0], 
+                                                   self.pending_mods[i][1], 
+                                                   self.pending_mods[i][-1][3])
+                
+            self.polylattice.interactions.modify_alpha(self.pending_mods[i][0], 
+                                                       self.pending_mods[i][1], 
+                                                       self.pending_mods[i][-1][4])
+            
+            self.polylattice.interactions.modify_lambda(self.pending_mods[i][0], 
+                                                        self.pending_mods[i][1], 
+                                                        self.pending_mods[i][-1][5])
+        self.pending_mods = []
 
             
         
@@ -245,7 +290,7 @@ undump 1        \n\
         crosslinker_beads = self.polylattice.crosslink_data()
         walk_beads = self.polylattice.walk_data()
         
-        # write the initial 
+        # write the initial
         f.write(f"\
 #-----------------------------------------------------------------------------------           \n\
 # NANOPOLY - POLYMER NANOCOMPOSITE STRUCTURAL DATA FILE                                        \n\
@@ -487,8 +532,8 @@ compute         1 all stress/atom NULL \n\
 
     def equilibrate(self, steps, timestep, temp, dynamics,
                     bonding=False, final_temp=None,
-                    damp=10.0, tdamp=None, pdamp=None, drag=2.0,
-                    output_steps=100, dump=0, data=('step','temp','press'),
+                    damp=10.0, tdamp=None, pdamp=None, drag=2.0, scale=False,
+                    output_steps=100, dump=0, data=('step','temp','press', 'pe', 'ke'),
                     seed=random.randrange(0,99999),
                     rcf=False,
                     reset=False, description=None):
@@ -538,8 +583,15 @@ compute         1 all stress/atom NULL \n\
                 f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
 ")
+
+            if scale:
+                f.write(f"\
+velocity        all scale {temp} \n")
+            else:
+                f.write(f"\
+velocity        all create {float(temp)} {seed} \n")
+
             f.write(f"\
-velocity        all create {float(temp)} 1231 \n\
 fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
 ")
@@ -704,7 +756,7 @@ undump 1        \n\
 unfix datafile \n\
 ")
             
-    def run(self, folder=None, mpi=0):
+    def run(self, folder=None, lammps_path= None, mpi=0):
         """
         Carries out the LAMMPS run.
         """
@@ -731,7 +783,11 @@ unfix datafile \n\
         else:
             print(f"Running {self.file_name} with parallel LAMMPS implementation.")
             print(f"Number of cores: {mpi}.")
-            os.system(f"mpirun -np {mpi} lmp -in {self.file_name}")
+
+            if lammps_path==None:
+                os.system(f"mpirun -np {mpi} lmp -in {self.file_name}")
+            else:
+                os.system(f"mpirun -np {mpi} {lammps_path} -in {self.file_name}")
 
         if correct_dumping == 1:
             if self.data_production == 1:

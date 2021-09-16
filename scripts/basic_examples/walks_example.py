@@ -12,9 +12,9 @@ from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 100.0
+box_size = 21.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=80)
+box = PolyLattice(box_size, cellnums=15)
 t1 = time.time()
 
 simname = "walks_example"
@@ -23,15 +23,15 @@ print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t
 
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
-                         (0.001, 1.0, 1.5))
+                         (1.0, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (0.001, 1.0, 1.5),
-                         ('a,b', (0.001, 0.2, 1.5)))
+                         (1.0, 1.0, 1.5),
+                         ('a,b', (1.0, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
-num_walks = 800
-size = 800
+num_walks = 50
+size = 30
 # size of the chain
 rw_kval = 30
 rw_cutoff = 1.5
@@ -97,7 +97,7 @@ box.simulation.view(view_path, "test_structure.in")
 # box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=8)
 
 # Total wall time: 0:00:09
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=16)
+box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=16)
 
 # Total wall time: 0:00:08
 # box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=20)

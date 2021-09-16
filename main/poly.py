@@ -111,9 +111,14 @@ class PolyLattice:
                 self.energy_matrix = np.array([potential[1]])
                 self.cutoff_matrix = np.array([potential[2]])
 
-                self.n_matrix = np.array([potential[3][0]])
-                self.alpha_matrix = np.array([potential[3][1]])
-                self.lmbda_matrix = np.array([potential[3][2]])
+                if len(potential) == 4:
+                    self.n_matrix = np.array([potential[3][0]])
+                    self.alpha_matrix = np.array([potential[3][1]])
+                    self.lmbda_matrix = np.array([potential[3][2]])
+                else:
+                    self.n_matrix = np.array([0])
+                    self.alpha_matrix = np.array([0])
+                    self.lmbda_matrix = np.array([1])
                 
                 self.num_types+=1
                 
@@ -295,6 +300,50 @@ class PolyLattice:
             namestring = f"{type1},{type2}"
             ni, nj = np.where(self.type_matrix == namestring)
             return self.lmbda_matrix[ni,nj][0]
+
+        # ----------------------------------------------------------------------------------
+
+        def modify_sigma(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.sigma_matrix[ni,nj] = new_val
+            self.sigma_matrix[nj,ni] = new_val
+
+        def modify_energy(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.energy_matrix[ni,nj] = new_val
+            self.energy_matrix[nj,ni] = new_val
+        
+        def modify_cutoff(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.cutoff_matrix[ni,nj] = new_val
+            self.cutoff_matrix[nj,ni] = new_val
+
+        def modify_n(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.n_matrix[ni,nj] = new_val
+            self.n_matrix[nj,ni] = new_val
+
+        def modify_alpha(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.alpha_matrix[ni,nj] = new_val
+            self.alpha_matrix[nj,ni] = new_val
+
+        def modify_lambda(self, type1, type2, new_val):
+            # modifys the interaction between two beads
+            namestring = f"{type1},{type2}"
+            ni, nj = np.where(self.type_matrix == namestring)
+            self.lmbda_matrix[ni,nj] = new_val
+            self.lmbda_matrix[nj,ni] = new_val
 
     def __init__(self, boxsize, cellnums=1.0):
         """        
