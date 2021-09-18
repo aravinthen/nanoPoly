@@ -95,4 +95,4 @@ box.simulation.equilibrate(100000,
 chain_grow('mainbead', 'subbead', 1.0, 100000, 1000, 100000, 1.0, 0.01)
 
 # lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18
-box.simulation.run(folder="interactions")
+# box.simulation.run(folder="interactions")

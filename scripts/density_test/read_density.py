@@ -11,11 +11,12 @@ sys.path.insert(0, '../../main')
 from simulation import Simulation
 from poly import PolyLattice
 from analysis import Check
+from meanfield import MeanField
 
 print("NANOPOLY SIMULATION")
-box_size = 100.0
+box_size = 10.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=80)
+box = PolyLattice(box_size, cellnums=20)
 t1 = time.time()
 
 simname = "walks_example"
@@ -26,17 +27,17 @@ print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t
 #----------------------------------------------------------------------------------------
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
-                         (1.0, 1.0, 1.5))
+                         (0.01, 1.0, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (1.0, 1.0, 1.5),
-                         ('a,b', (1.0, 0.2, 1.5)))
+                         (0.01, 1.0, 1.5),
+                         ('a,b', (0.01, 0.2, 1.5)))
 
 #----------------------------------------------------------------------------------------
 # DENSITY ASSIGNMENT
 #----------------------------------------------------------------------------------------
 t0 = time.time()    
-box.density_file("density_file.txt")
+box.meanfield.density_file("rho_grid")
 t1 = time.time()
 print(f"Density file read in. Time taken: {t1 - t0}")
 
@@ -44,7 +45,7 @@ print(f"Density file read in. Time taken: {t1 - t0}")
 # RANDOM WALK ASSIGNMENT
 #----------------------------------------------------------------------------------------
 # following values determine the bonding of the random walks
-num_walks = 1
+num_walks = 200
 size = 800
 # size of the chain
 rw_kval = 30
@@ -83,7 +84,7 @@ total_time+= t1-t0
 print(f"Walks complete. Total time: {total_time} seconds")
 
 t0 = time.time()
-box.simulation.structure("test_structure.in")
+box.simulation.structure("test_structure2.in")
 t1 = time.time()
 total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
@@ -102,4 +103,4 @@ box.simulation.equilibrate(15000,
                            dump=dmp)
 
 view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure.in")
+box.simulation.view(view_path, "test_structure2.in")

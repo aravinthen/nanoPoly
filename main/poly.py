@@ -20,6 +20,7 @@ sys.path.append(".")
 
 from simulation import Simulation
 from analysis import Check, Percolation
+from meanfield import MeanField
 
 class PolyLattice:
     """
@@ -39,6 +40,7 @@ class PolyLattice:
     sim_attr = Simulation
     che_attr = Check
     per_attr = Percolation
+    scf_attr = MeanField
     
     class Cell:
         def __init__(self, index1, index2, index3, position, cellsides):            
@@ -77,7 +79,7 @@ class PolyLattice:
             self.cutoff_matrix = None  # cutoff between types
             
             # next parameters only to be used in the case of SOFT POTENTIALS            
-            self.n_matrix = None   
+            self.n_matrix = None
             self.alpha_matrix = None  
             self.lmbda_matrix = None  
             
@@ -263,8 +265,6 @@ class PolyLattice:
                     self.lmbda_matrix[ri[0], rj[0]] = soft_properties[2]
                     self.lmbda_matrix[ni[0], nj[0]] = soft_properties[2]
 
-                    
-
         def return_sigma(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
@@ -368,7 +368,9 @@ class PolyLattice:
         # attached libraries
         self.simulation = Simulation(self) # the simulation class
         self.check = Check(self) # the Check subclass
-        self.percolation = Percolation(self) # the Percolation class        
+        self.percolation = Percolation(self) # the Percolation class
+        self.meanfield = MeanField(self)
+        
         # bond details
         self.bonds = None # 
 
@@ -390,7 +392,6 @@ class PolyLattice:
         self.bclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
 
 
-        self.density = None
         self.nanostructure = None
         
         # counts
@@ -492,44 +493,13 @@ class PolyLattice:
 
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
 
-
-    def density_file(self, density_file):
-        if self.interactions.num_types == 0:
-            raise EnvironmentError("Types must be defined before setting densities.")
-
-        count=0
-        with open(density_file, 'r') as f:
-            # check if the number of beads in file match with the number of beads in interaction data
-            file_beads = len(f.readline().strip().split("\t")[3:])
-
-            if file_beads != self.interactions.num_types:                
-                raise EnvironmentError("Defined bead types and file bead types do not match.")
-
-            
-        with open(density_file, 'r') as f:
-            for line in f:
-                count+=1
-                datum = line.strip().split("\t")
-                cell = [int(datum[i]) for i in range(0,3)]
-                density_data = [float(datum[i]) for i in range(3,len(datum))]
-
-                if any(i < 0.0 for i in density_data):
-                    raise EnvironmentError("Unphysical densities contained with density file.")
-
-                self.index(cell).densities = density_data
-                
-        print(f"{count} density values read into box.")
-
-        self.density == True
-            
-    
     def randomwalk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,        
                    style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
                    mc=False,
                    end_pos=None,
                    soften=True,
                    termination=None, initial_failures=10000, walk_failures=10000):
-        """
+        """index_c
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
         Otherwise, walk begins at specified cell.
@@ -557,6 +527,9 @@ class PolyLattice:
         ID = self.num_walks + 1
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
+
+        if self.meanfield.density != True:
+            raise EnvironmentError("Density file has not been assigned.")
         
         def rand_distance(length, dimension):
             """
@@ -712,8 +685,8 @@ class PolyLattice:
                 if distance < mini*self.interactions.return_sigma(bead_sequence[0], j[2]):
                     issues+=1
                     break # stop checking neighbours
+                
             # monte carlo check
-
             if mc == True:
                 random_num = np.random.uniform(0,1)
                 density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
@@ -882,7 +855,6 @@ class PolyLattice:
                 # monte carlo check
                 if mc == True:
                     random_num = np.random.uniform(0,1)
-#                    print(index_c, bead_type, self.index(index_c).densities)
                     density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
                     if random_num > density:
                         issues+=1
