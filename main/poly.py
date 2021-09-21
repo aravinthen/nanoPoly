@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append(".")
 
-from simulation import Simulation
+from mdsim import MDSim
 from analysis import Check, Percolation
 from meanfield import MeanField
 
@@ -37,7 +37,7 @@ class PolyLattice:
                                   4. forbidden: BOOLEAN -  Cannot host atoms if this is valued True
     """
     
-    sim_attr = Simulation
+    md_attr = MDSim
     che_attr = Check
     per_attr = Percolation
     scf_attr = MeanField
@@ -366,7 +366,7 @@ class PolyLattice:
         self.interactions = self.Interactions(self.cellside)
 
         # attached libraries
-        self.simulation = Simulation(self) # the simulation class
+        self.mdsim = MDSim(self) # the simulation class
         self.check = Check(self) # the Check subclass
         self.percolation = Percolation(self) # the Percolation class
         self.meanfield = MeanField(self)

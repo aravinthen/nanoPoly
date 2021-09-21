@@ -14,7 +14,7 @@ import shutil
 from datetime import date
 today = date.today()
 
-class Simulation:
+class MDSim:
     # stages of the simulation
 
     def __init__(self, polylattice):

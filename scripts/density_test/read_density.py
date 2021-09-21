@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, '../../main')
 
-from simulation import Simulation
+from mdsim import MDSim
 from poly import PolyLattice
 from analysis import Check
 from meanfield import MeanField
@@ -45,7 +45,7 @@ print(f"Density file read in. Time taken: {t1 - t0}")
 # RANDOM WALK ASSIGNMENT
 #----------------------------------------------------------------------------------------
 # following values determine the bonding of the random walks
-num_walks = 200
+num_walks = 20
 size = 800
 # size of the chain
 rw_kval = 30
@@ -84,23 +84,23 @@ total_time+= t1-t0
 print(f"Walks complete. Total time: {total_time} seconds")
 
 t0 = time.time()
-box.simulation.structure("test_structure2.in")
+box.mdsim.structure("test_structure2.in")
 t1 = time.time()
 total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
 
-box.simulation.settings("test_settings.in", nskin=2.0) 
+box.mdsim.settings("test_settings.in", nskin=2.0) 
 desc1 = "testing"
 
 timestep = 1e-3
 # equilibrate the system to iron out the minima
-box.simulation.equilibrate(15000,
-                           timestep,
-                           1.0,
-                           'langevin',
-                           output_steps=100,
-                           description=desc1,
-                           dump=dmp)
+box.mdsim.equilibrate(15000,
+                      timestep,
+                      1.0,
+                      'langevin',
+                      output_steps=100,
+                      description=desc1,
+                      dump=dmp)
 
 view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure2.in")
+box.mdsim.view(view_path, "test_structure2.in")

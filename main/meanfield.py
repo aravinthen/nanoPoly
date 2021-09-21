@@ -11,7 +11,17 @@ class MeanField:
 
         self.density = False
 
-        
+
+    def guess_field(self,):
+        pass
+
+    def parameters(self,):
+        pass
+
+    def run(self,):
+        pass
+
+         
     def density_file(self, density_file):
         if self.polylattice.interactions.num_types == 0:
             raise EnvironmentError("Types must be defined before setting densities.")

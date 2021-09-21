@@ -3,9 +3,9 @@
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        
 #-----------------------------------------------------------------------------------
 # FILENAME: test_settings.in                                                        
-# DATE: 2021-09-19                                                                     
+# DATE: 2021-09-21                                                                     
 # OVERVIEW:                                                                         
-#    Number of polymer chains:       30                   
+#    Number of polymer chains:       20                   
 #    Number of bonded crosslinks:    0                
 #    Number of unbonded crosslinks:  0                
 #    Number of grafted chains:       0                  
@@ -44,9 +44,9 @@ compute         1 all stress/atom NULL
 # Description: {description}
 #---------------------------------------------------------------------------------------------------
 dump            1 all cfg 100 dump.test_settings.in_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]
-velocity        all create 1.0 27838 
+velocity        all create 1.0 33176 
 fix             1 all nve/limit 1.5
-fix             2 all langevin 1.0 1.0 10.0 27838
+fix             2 all langevin 1.0 1.0 10.0 33176
 thermo_style    custom step temp press pe ke 
 thermo          100
 run             15000 
