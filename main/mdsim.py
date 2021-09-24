@@ -87,8 +87,8 @@ class MDSim:
     def run_modifications(self, total_steps, spacing,
                           temp, timestep, final_temp=None, 
                           damp=10, tdamp=None, pdamp=None, drag=2.0,
+                          scale=True,
                           data=('step','temp','press', 'pe', 'ke'), output_steps=100,
-                          scale=False,
                           dump=0, seed = random.randrange(0,99999), description=None):
         """
         Runs all of the changes stored up in the 'bead_mod' list.
@@ -166,12 +166,13 @@ pair_coeff    {num1} {num2} {round(energy,5)} {sigma} {lmbda}                   
                 f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz\n\
 ")
+
             if scale:
                 f.write(f"\
 velocity        all scale {temp} \n")
             else:
                 f.write(f"\
-velocity        all create {float(temp)} {seed} \n")
+velocity        all create {float(temp)} {seed} \n")                
 
             f.write(f"\
 fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
@@ -184,6 +185,7 @@ run             {spacing} \n\
 unfix 1         \n\
 unfix 2         \n\
 ")
+
             if self.dumping == 1:
                 self.dumping = 0
                 f.write(f"\
@@ -218,7 +220,7 @@ dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs 
 velocity        all scale {temp} \n")
             else:
                 f.write(f"\
-velocity        all create {float(temp)} {seed} \n")
+velocity        all create {float(temp)} {seed} \n")                
 
             f.write(f"\
 fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
@@ -543,7 +545,7 @@ compute         1 all stress/atom NULL \n\
         temp       - the temperature at which the equilibration will take place
         dynamics   - the type of equilibration that'll be taking place
                      'langevin' uses the nve and langevin thermostats
-                     'npt' carries out npt dynamics
+                     'nose_hoover' carries out npt dynamics
         bonding    - dependent on whether crosslinking is performed unbonded.
         final_temp - used for heating and cooling equilibrations
         """

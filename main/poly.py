@@ -528,7 +528,7 @@ class PolyLattice:
         if termination == "None":
             print("Warning: if this random walk is unsucessful, the program will terminate.")
 
-        if self.meanfield.density != True:
+        if self.meanfield.density != True and mc != False:
             raise EnvironmentError("Density file has not been assigned.")
         
         def rand_distance(length, dimension):

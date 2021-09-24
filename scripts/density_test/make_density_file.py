@@ -1,4 +1,4 @@
-# Program Name: make_density_file.py
+yes# Program Name: make_density_file.py
 # Author: Aravinthen Rajkumar
 # Description: creates a lamellar density file
 

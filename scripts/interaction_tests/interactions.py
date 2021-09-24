@@ -6,12 +6,12 @@ import numpy as np
 import time
 import sys
 sys.path.insert(0, '../../main')
-from simulation import Simulation
+from mdsim import MDSim
 from poly import PolyLattice
 
 # polylattice object
-box = PolyLattice(20.0, 15)
-dmp = 0
+box = PolyLattice(22.0, 15)
+dmp = 100
 
 def print_type():
     print(box.interactions.types)
@@ -35,7 +35,7 @@ box.interactions.newType("subbead", 1.0,
 # -------------------------------------------------------------------------
 # Running random walk
 # -------------------------------------------------------------------------
-num_walks = 1
+num_walks = 10
 rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
@@ -44,7 +44,7 @@ rw_sigma = 1.0
 print("Starting walks.")
 for i in range(num_walks):
     print(f"Walk {i}")
-    box.randomwalk(100,
+    box.randomwalk(800,
                    rw_kval,
                    rw_cutoff,
                    rw_epsilon,
@@ -56,43 +56,34 @@ for i in range(num_walks):
                    termination="soften")
 
 print("Walks complete.")
-box.simulation.structure("int_structure.in")
-box.simulation.settings("int_settings.in", nlist=[10,10000], nskin=4.0) 
+box.mdsim.structure("int_structure.in")
+box.mdsim.settings("int_settings.in", nlist=[10,10000], nskin=4.0) 
 
 # # -------------------------------------------------------------------------
 # # Modifying interactions mid simulation
 # # -------------------------------------------------------------------------
 
 def chain_grow(type1, type2, lmbdaval, mod_time, mod_space, equib_time, temp, tstep):
-    box.simulation.modify_interaction(type1, type2, new_lambda= lmbdaval)
-    box.simulation.modify_interaction(type1, type1, new_lambda= lmbdaval)
-    box.simulation.modify_interaction(type2, type2, new_lambda= lmbdaval)
-    box.simulation.run_modifications(mod_time, mod_space, temp, tstep, damp=1, dump=dmp, scale=True)
+    box.mdsim.modify_interaction(type1, type2, new_lambda= lmbdaval)
+    box.mdsim.modify_interaction(type1, type1, new_lambda= lmbdaval)
+    box.mdsim.modify_interaction(type2, type2, new_lambda= lmbdaval)
+    box.mdsim.run_modifications(mod_time, mod_space, temp, tstep, damp=1, dump=dmp, scale=False)
 
-    box.simulation.equilibrate(equib_time, 
+    box.mdsim.equilibrate(equib_time, 
                                tstep, 
                                temp, 
                                'langevin', 
-                               scale=True, 
+                               scale=False, 
                                output_steps=100,
                                damp=1,
                                dump=dmp)
 
-box.simulation.modify_interaction('mainbead', 'subbead', new_sigma=1.0, new_cutoff=1.5)
-box.simulation.modify_interaction('mainbead', 'mainbead', new_sigma=1.0, new_cutoff=1.5)
-box.simulation.modify_interaction('subbead', 'subbead', new_sigma=1.0, new_cutoff=1.5)
-box.simulation.run_modifications(2000, 100, 1, 0.1, dump=dmp)
-
-box.simulation.equilibrate(100000, 
-                           0.1,
-                           1.0,
-                           'langevin',
-                           output_steps=100,
-                           dump=dmp)
+box.mdsim.modify_interaction('mainbead', 'subbead', new_sigma=1.0, new_cutoff=1.5)
+box.mdsim.modify_interaction('mainbead', 'mainbead', new_sigma=1.0, new_cutoff=1.5)
+box.mdsim.modify_interaction('subbead', 'subbead', new_sigma=1.0, new_cutoff=1.5)
+box.mdsim.run_modifications(2000, 100, 0, 0.1, dump=dmp, scale=False)
 
 
+chain_grow('mainbead', 'subbead', 1.0, 20000, 200, 50000, 0.0, 0.01)
 
-chain_grow('mainbead', 'subbead', 1.0, 100000, 1000, 100000, 1.0, 0.01)
-
-# lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18
-# box.simulation.run(folder="interactions")
+box.mdsim.run(folder="fail2", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)
