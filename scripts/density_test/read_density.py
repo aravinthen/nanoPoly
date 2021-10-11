@@ -14,9 +14,9 @@ from analysis import Check
 from meanfield import MeanField
 
 print("NANOPOLY SIMULATION")
-box_size = 10.0
+box_size = 50.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=20)
+box = PolyLattice(box_size, cellnums=40)
 t1 = time.time()
 
 simname = "walks_example"
@@ -27,17 +27,17 @@ print(f"Box generated, with {len(box.Cells)} cells in total. Time taken: {t1 - t
 #----------------------------------------------------------------------------------------
 # Order of properties: Sigma, energy, cutoff
 box.interactions.newType("a", 1.0,
-                         (0.01, 0.2, 1.5, ((1, 1.0, 0.1))))
+                         (0.01, 0.2, 1.5))
 
 box.interactions.newType("b", 0.5,
-                         (0.01, 1.0, 1.5, (1, 1.0, 0.1)),
-                         ('a,b', (0.01, 0.2, 1.5),  (1, 1.0, 0.1)))
+                         (0.01, 1.0, 1.5),
+                         ('a,b', (0.1, 0.2, 1.5)))
 
 #----------------------------------------------------------------------------------------
 # DENSITY ASSIGNMENT
 #----------------------------------------------------------------------------------------
 t0 = time.time()    
-box.meanfield.density_file("rho_grid")
+box.meanfield.density_file("rho_grid", [20,20,20])
 t1 = time.time()
 print(f"Density file read in. Time taken: {t1 - t0}")
 
@@ -45,7 +45,7 @@ print(f"Density file read in. Time taken: {t1 - t0}")
 # RANDOM WALK ASSIGNMENT
 #----------------------------------------------------------------------------------------
 # following values determine the bonding of the random walks
-num_walks = 1
+num_walks = 100
 size = 800
 # size of the chain
 rw_kval = 30
@@ -70,7 +70,7 @@ for i in range(num_walks):
                    rw_epsilon,
                    rw_sigma,
                    bead_sequence = copolymer,
-                   mc = True,
+                   meanfield = True,
                    initial_failures= 10000,
                    walk_failures = 10000,
                    soften=True,
@@ -96,32 +96,8 @@ timestep = 1e-3
 
 dmp = 100
 # -------------------------------------------------------------------------------------
-# Growing the chain
-box.mdsim.modify_interaction('a', 'b', new_sigma=1.0, new_cutoff=1.5)
-box.mdsim.modify_interaction('a', 'a', new_sigma=1.0, new_cutoff=1.5)
-box.mdsim.modify_interaction('b', 'b', new_sigma=1.0, new_cutoff=1.5)
-box.mdsim.run_modifications(2000, 100, 1, 0.1, dump=dmp)
-#----------------------------------------------------------------------------------------
-
-def chain_grow(type1, type2, lmbdaval, mod_time, mod_space, equib_time, temp, tstep):
-    box.mdsim.modify_interaction(type1, type2, new_lambda= lmbdaval)
-    box.mdsim.modify_interaction(type1, type1, new_lambda= lmbdaval)
-    box.mdsim.modify_interaction(type2, type2, new_lambda= lmbdaval)
-    box.mdsim.run_modifications(mod_time, mod_space, temp, tstep, damp=1, dump=dmp)
-
-    box.mdsim.equilibrate(equib_time, 
-                               tstep, 
-                               temp, 
-                               'langevin', 
-                               scale=True, 
-                               output_steps=100,
-                               damp=1,
-                               dump=dmp)
-
-chain_grow('a', 'b', 1.0, 100000, 1000, 100000, 1.0, 0.01)
-
 
 view_path = "~/ovito/build/bin/ovito"
-# box.mdsim.view(view_path, "test_structure2.in")
+box.mdsim.view(view_path, "test_structure2.in")
 
-box.mdsim.run(folder="frozen_velocities", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)
+# box.mdsim.run(folder="frozen_velocities", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)

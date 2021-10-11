@@ -5,9 +5,11 @@
 import numpy as np
 import time
 import sys
+
 sys.path.insert(0, '../../main')
 from mdsim import MDSim
 from poly import PolyLattice
+from structure import Structure
 
 # polylattice object
 box = PolyLattice(22.0, 15)
@@ -29,8 +31,6 @@ box.interactions.newType("mainbead", 0.5,
 box.interactions.newType("subbead", 1.0,
                          (0.1, 0.5, 1.5, (1, 1.0, 0.1)),
                          ('mainbead,subbead', (0.1, 0.2, 1.5, (1, 1.0, 0.1))))
-
-
 # print_type()
 # -------------------------------------------------------------------------
 # Running random walk
@@ -86,4 +86,4 @@ box.mdsim.run_modifications(2000, 100, 0, 0.1, dump=dmp, scale=False)
 
 chain_grow('mainbead', 'subbead', 1.0, 20000, 200, 50000, 0.0, 0.01)
 
-box.mdsim.run(folder="fail2", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)
+#  box.mdsim.run(folder="fail2", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)

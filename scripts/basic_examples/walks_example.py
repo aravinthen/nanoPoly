@@ -7,14 +7,14 @@ import time
 import sys
 
 sys.path.insert(0, '../../main')
-from simulation import Simulation
+from mdsim import MDSim
 from poly import PolyLattice
 from analysis import Check
 
 print("NANOPOLY SIMULATION")
-box_size = 21.0
+box_size = 15.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=15)
+box = PolyLattice(box_size, cellnums=10)
 t1 = time.time()
 
 simname = "walks_example"
@@ -30,8 +30,8 @@ box.interactions.newType("b", 0.5,
                          ('a,b', (1.0, 0.2, 1.5)))
 
 # following values determine the bonding of the random walks
-num_walks = 50
-size = 30
+num_walks = 15
+size = 60
 # size of the chain
 rw_kval = 30
 rw_cutoff = 1.5
@@ -50,13 +50,15 @@ total_time = 0
 for i in range(num_walks):
     t0 = time.time()
     box.randomwalk(size,
-                    rw_kval,
-                    rw_cutoff,
-                    rw_epsilon,
-                    rw_sigma,
-                    bead_sequence = copolymer,
-                    initial_failures= 10000,
-                    walk_failures = 10000,
+                   rw_kval,
+                   rw_cutoff,
+                   rw_epsilon,
+                   rw_sigma,
+                   density_mc = True,
+                   bead_sequence = copolymer,
+                   initial_failures= 10000,
+                   walk_failures = 10000,
+                   
                     soften=True,
                     termination="soften")
     t1 = time.time()
@@ -68,17 +70,17 @@ total_time+= t1-t0
 print(f"Walks complete. Total time: {total_time} seconds")
 
 t0 = time.time()
-box.simulation.structure("test_structure.in")
+box.mdsim.structure("test_structure.in")
 t1 = time.time()
 total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
 
-box.simulation.settings("test_settings.in", nskin=2.0) 
+box.mdsim.settings("test_settings.in", nskin=2.0) 
 desc1 = "testing"
 
 timestep = 1e-3
 # equilibrate the system to iron out the minima
-box.simulation.equilibrate(15000,
+box.mdsim.equilibrate(15000,
                            timestep,
                            1.0,
                            'langevin',
@@ -88,25 +90,26 @@ box.simulation.equilibrate(15000,
 
 
 view_path = "~/ovito/build/bin/ovito"
-box.simulation.view(view_path, "test_structure.in")
 
+# box.mdsim.view(view_path, "test_structure.in")
 # Total wall time: 0:00:56
-# box.simulation.run(folder=simname)
+# box.mdsim.run(folder=simname)
 
 # Total wall time: 0:00:15
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=8)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=8)
 
 # Total wall time: 0:00:09
-box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=16)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=16)
 
 # Total wall time: 0:00:08
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=20)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=20)
 
 # Total wall time: 0:00:08
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=21)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=21)
 
 # Total wall time: 0:00:09
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=24)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=24)
 
 # Total wall time: 0:00:12
-# box.simulation.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=32)
+# box.mdsim.run(folder=simname, lammps_path="~/Research/lammps/src/lmp_mpi", mpi=32)
+
