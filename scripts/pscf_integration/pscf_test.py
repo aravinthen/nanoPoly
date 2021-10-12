@@ -27,5 +27,7 @@ box.interactions.newType("b", 1.0,
                          ('a,b', (0.1, 0.2, 1.5, (1, 1.0, 0.1))))
 
 box.meanfield.parameters("test",
+                         [5,5,5],
+                         'cubic',
                          [("a", 0.1), ("b", 0.9), ("a", 0.1)],
                          [("a", 0.15), ("b", 0.8), ("a", 0.15)])

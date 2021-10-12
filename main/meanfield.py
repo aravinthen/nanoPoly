@@ -26,8 +26,8 @@ class MeanField:
 
 
     def parameters(self,
-                   unit,
                    pname,
+                   unit,
                    crystal,
                    group_name,
                    error_max=1,

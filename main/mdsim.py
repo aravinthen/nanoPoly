@@ -268,6 +268,63 @@ undump 1        \n\
                                                         self.pending_mods[i][-1][5])
         self.pending_mods = []
 
+    def reapply_interactions(self, soft = False, description=None):
+        """
+        Used to reapply an interactions instantaneously.
+        Best performed immediately prior to a minimisation.
+        """
+        f = open(self.file_name, 'a')
+        f.write("\n\
+#---------------------------------------------------------------------------------------------------\n\
+# REDEFINE POTENTIAL                                                                                \n")
+                
+        if description != None:
+            f.write("# Description: {description}\n")
+
+        f.write("\
+#---------------------------------------------------------------------------------------------------\n\
+")
+
+
+        if soft == True:
+            for i in range(np.shape(self.polylattice.interactions.type_matrix)[0]):
+                for j in range(i, np.shape(self.polylattice.interactions.type_matrix)[0]):
+                    typestring = self.polylattice.interactions.type_matrix[i,j]
+                    type1, type2 = typestring.split(",")
+
+                    num1 = self.polylattice.interactions.typekeys[type1]
+                    num2 = self.polylattice.interactions.typekeys[type2]                
+                    energy = self.polylattice.interactions.return_energy(type1, type2)
+                    sigma = self.polylattice.interactions.return_sigma(type1, type2)
+                    cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
+                    n = self.polylattice.interactions.return_n(type1, type2)
+                    alpha = self.polylattice.interactions.return_alpha(type1, type2)
+                    lmbda = self.polylattice.interactions.return_lambda(type1, type2)
+                
+                    f.write(f"\n\
+pair_style    lj/cut/soft {n} {alpha} {cutoff}                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma} {lmbda}                         \n\
+") 
+
+        else:
+            # add pair interactions of different beads
+            for i in range(np.shape(self.polylattice.interactions.type_matrix)[0]):
+                for j in range(i, np.shape(self.polylattice.interactions.type_matrix)[0]):
+                    typestring = self.polylattice.interactions.type_matrix[i,j]
+                    type1, type2 = typestring.split(",")
+                    num1 = self.polylattice.interactions.typekeys[type1]
+                    num2 = self.polylattice.interactions.typekeys[type2]
+                
+                    energy = self.polylattice.interactions.return_energy(type1, type2)
+                    sigma = self.polylattice.interactions.return_sigma(type1, type2)
+                    cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
+                
+                    f.write(f"\
+pair_style    lj/cut {cutoff}                                                         \n\
+pair_coeff    {num1} {num2} {round(energy,5)} {sigma}                                  \n\
+")            
+
+        f.close()
             
         
     def structure(self, datafile=None):
@@ -402,7 +459,11 @@ Bonds                                                                           
 
 #-----------------------------------------------------------------------------------------------------
 
-    def settings(self, filename=None, nlist=[10,1000], nskin=1.0, dielectric=False):
+    def settings(self, 
+                 filename=None,
+                 nlist=[10,1000],
+                 nskin=1.0,
+                 dielectric=False):
         """ 
         NOTE: This comes SECOND in the simulation order of precedence!
               Will flag an error if sim_structure hasn't run first.
@@ -531,6 +592,32 @@ compute         1 all stress/atom NULL \n\
         self.set_settings = True
 
         f.close()
+
+    def minimize(self, 
+                 etol,
+                 ftol,
+                 mit=1000,
+                 meval=10000,
+                 style='cg'):
+        """
+        This should be used when the LJ parameters used to build the molecular model are different from those that 
+        the simulation uses.
+
+        Parameter:
+        style   - options are cg, hftn, sd, quickmin, fire/old, spin, spin/cg, spin/lbfgs
+        etol    - energy tolerance            
+        ftol    - force tolerance
+        mit     - max iterations of minimizer 
+        meval   - max number of force/energy iterations
+        """
+
+        f = open(self.file_name, 'a')
+        f.write(f"\
+min_style    {style}                        \n\
+minimize     {etol} {ftol} {mit} {meval}    \n\
+")
+        f.close()
+
 
     def equilibrate(self, steps, timestep, temp, dynamics,
                     bonding=False, final_temp=None,
