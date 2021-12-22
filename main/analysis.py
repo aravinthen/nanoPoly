@@ -143,6 +143,5 @@ class Percolation:
                             new_path.append(coord)
                             paths.append(new_path)
                             num_paths+=1
-
                             
             return paths

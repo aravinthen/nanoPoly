@@ -31,13 +31,13 @@ box.interactions.newType("a", 1.0,
 
 box.interactions.newType("b", 0.5,
                          (0.01, 1.0, 1.5),
-                         ('a,b', (0.1, 0.2, 1.5)))
+                         ('a,b', (0.01, 0.2, 1.5)))
 
 #----------------------------------------------------------------------------------------
 # DENSITY ASSIGNMENT
 #----------------------------------------------------------------------------------------
 t0 = time.time()    
-box.meanfield.density_file("rho_grid", [20,20,20])
+box.meanfield.density_file("rho_grid2", [10,10,10])
 t1 = time.time()
 print(f"Density file read in. Time taken: {t1 - t0}")
 
@@ -64,17 +64,13 @@ for i in range(400):
 total_time = 0
 for i in range(num_walks):
     t0 = time.time()
-    box.randomwalk(size,
-                   rw_kval,
-                   rw_cutoff,
-                   rw_epsilon,
-                   rw_sigma,
-                   bead_sequence = copolymer,
-                   meanfield = True,
-                   initial_failures= 10000,
-                   walk_failures = 10000,
-                   soften=True,
-                   termination="soften")
+    box.uniform_chain(size,
+                      rw_kval,
+                      rw_cutoff,
+                      rw_epsilon,
+                      rw_sigma,
+                      bead_sequence = copolymer,
+                      meanfield = True)
     t1 = time.time()
     total_time+= t1-t0
     print(f"Walk {i} completed in {t1-t0} seconds. Total time elapsed: {total_time}")
@@ -90,6 +86,19 @@ total_time = t1-t0
 print(f"Structure file created. Total time: {total_time} seconds.")
 
 box.mdsim.settings("test_settings.in", nskin=2.0, nlist=[10,10000]) 
+
+strain1 = [-2e-2, 0, 0]
+timestep=0.005
+desc1="deformation"
+box.mdsim.deform(100000, 
+                      timestep,
+                      strain1,
+                      1.0,
+                      reset=False,
+                      dump=dmp,
+                      datafile=False,
+                      description=desc1)
+
 desc1 = "testing"
 
 timestep = 1e-3
@@ -97,7 +106,7 @@ timestep = 1e-3
 dmp = 100
 # -------------------------------------------------------------------------------------
 
-view_path = "~/ovito/build/bin/ovito"
+view_path = "~/ovito-basic-3.5.4-x86_64/bin/ovito"
 box.mdsim.view(view_path, "test_structure2.in")
 
 # box.mdsim.run(folder="frozen_velocities", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)

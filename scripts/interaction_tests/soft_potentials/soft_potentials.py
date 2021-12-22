@@ -10,8 +10,8 @@ from mdsim import MDSim
 from poly import PolyLattice
 
 # polylattice object
-box = PolyLattice(50.0, 40)
-dmp = 0
+box = PolyLattice(22.0, 40)
+dmp = 100
 
 def print_type():
     print(box.interactions.types)
@@ -35,7 +35,7 @@ box.interactions.newType("subbead", 1.0,
 # -------------------------------------------------------------------------
 # Running random walk
 # -------------------------------------------------------------------------
-num_walks = 225
+num_walks = 10
 rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
@@ -46,12 +46,12 @@ timestep = 0.005
 print("Starting walks.")
 for i in range(num_walks):
     print(f"Walk {i}")
-    box.randomwalk(500,
+    box.randomwalk(1000,
                    rw_kval,
                    rw_cutoff,
                    rw_epsilon,
                    rw_sigma,
-                   bead_sequence = ['mainbead', 'subbead'],
+                   bead_sequence = ['mainbead' for i in range(500)]+['subbead' for i in range(500)],
                    initial_failures= 10000,
                    walk_failures = 10000,
                    soften=True,
@@ -78,13 +78,13 @@ box.mdsim.run_modifications(2000, 100, 0, 0.1, dump=dmp, scale=False)
 # -------------------------------------------------------------------------
 # It is possible to run this step without damping, but for the assembly of 
 # block copolymers it is preferable to have very high damping.
-box.mdsim.equilibrate(50000, 
-                      timestep, 
-                      0, 
-                      'langevin', 
-                      scale=False, 
-                      output_steps=100,
-                      dump=dmp)
+# box.mdsim.equilibrate(50000, 
+#                       timestep, 
+#                       0, 
+#                       'langevin', 
+#                       scale=False, 
+#                       output_steps=100,
+#                       dump=dmp)
 
 # -------------------------------------------------------------------------
 # Modifying soft-core potentials to hard-core Lennard-Jones potential
@@ -104,9 +104,31 @@ box.mdsim.minimize(1e-5, 1e-5, 10000, 100000)
 # -------------------------------------------------------------------------
 # Final equilibration
 # -------------------------------------------------------------------------
-box.mdsim.equilibrate(50000, 
+box.mdsim.equilibrate(20000, 
                       timestep, 
                       0, 
+                      'langevin', 
+                      scale=False, 
+                      output_steps=100,
+                      dump=dmp)
+
+# -------------------------------------------------------------------------
+# Heating
+# -------------------------------------------------------------------------
+box.mdsim.equilibrate(20000, 
+                      timestep, 
+                      1.0,
+                      'langevin', 
+                      scale=False, 
+                      output_steps=100,
+                      dump=dmp)
+
+# -------------------------------------------------------------------------
+# Quenching
+# -------------------------------------------------------------------------
+box.mdsim.equilibrate(20000, 
+                      timestep, 
+                      0.5,
                       'langevin', 
                       scale=False, 
                       output_steps=100,
@@ -116,3 +138,6 @@ box.mdsim.equilibrate(50000,
 # Run
 # -------------------------------------------------------------------------
 box.mdsim.run(folder="fail2", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)
+
+view_path = "~/ovito-basic-3.5.4-x86_64/bin/ovito"
+box.mdsim.view(view_path, "./fail2/dump.int_settings.in_0.cfg")

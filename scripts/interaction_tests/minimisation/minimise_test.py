@@ -5,7 +5,7 @@
 import numpy as np
 import time
 import sys
-sys.path.insert(0, '../../main')
+sys.path.insert(0, '../../../main')
 from mdsim import MDSim
 from poly import PolyLattice
 
@@ -40,7 +40,7 @@ rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
 rw_sigma = 1.0
-
+a
 print("Starting walks.")
 for i in range(num_walks):
     print(f"Walk {i}")
@@ -86,4 +86,9 @@ box.mdsim.equilibrate(15000,
                            description=desc1,
                            dump=dmp)
 
+view_path = "~/ovito-basic-3.5.4-x86_64/bin/ovito"
+box.mdsim.view(view_path, "test_structure.in")
+
 box.mdsim.run(folder="min_test", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)
+
+

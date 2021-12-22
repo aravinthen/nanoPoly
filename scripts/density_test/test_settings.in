@@ -3,12 +3,12 @@
 # Full project files can be found at: https://github.com/aravinthen/nanoPoly        
 #-----------------------------------------------------------------------------------
 # FILENAME: test_settings.in                                                        
-# DATE: 2021-10-10                                                                     
+# DATE: 2021-10-27                                                                     
 # OVERVIEW:                                                                         
-#    Number of polymer chains:       100                   
+#    Number of polymer chains:       200                   
 #    Number of bonded crosslinks:    0                
 #    Number of unbonded crosslinks:  0                
-#    Number of grafted chains:       0                  
+#    Number of grafted chains:       100                  
 #    Nanostructure:                  None               
 #-----------------------------------------------------------------------------------
                                                                                       
@@ -30,7 +30,7 @@ neigh_modify  every 10 one 10000
 pair_style    lj/cut 1.5                                                         
 pair_coeff    1 1 0.2 0.01                                  
 pair_style    lj/cut 1.5                                                         
-pair_coeff    1 2 0.2 0.1                                  
+pair_coeff    1 2 0.2 0.01                                  
 pair_style    lj/cut 1.5                                                         
 pair_coeff    2 2 1.0 0.01                                  
 
@@ -38,3 +38,20 @@ bond_style    fene
 special_bonds fene  
 bond_coeff    1 30 1.5 1.0 1.0 
 compute         1 all stress/atom NULL 
+
+#---------------------------------------------------------------------------------------------------------
+# DEFORMATION STAGE                                                                                       
+#---------------------------------------------------------------------------------------------------------
+run             0            
+dump            1 all cfg 100 dump.test_settings.in_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]
+velocity        all create 1.0 1231 
+fix             1 all langevin 1.0 1.0 0.5 18633 
+fix             2 all nve/limit 1.5
+fix		3 all deform 1 x trate -0.02 y trate 0 z trate 0 units box remap x 
+thermo_style    custom step temp lx ly lz pxx pyy pzz                   
+thermo          100                         
+run             100000                                
+unfix 1                                                
+unfix 2                                                
+unfix 3                                                
+undump 1        

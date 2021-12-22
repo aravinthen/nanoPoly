@@ -7,9 +7,12 @@ import time
 import sys
 
 sys.path.insert(0, '../main')
-from simulation import Simulation
+
+from mdsim import MDSim
 from poly import PolyLattice
 from analysis import Check
+from meanfield import MeanField
+
 
 print("NANOPOLY SIMULATION")
 box_size = 10.0
@@ -139,17 +142,10 @@ strain = [-1e-2, -1e-2, -1e-2]
 box.simulation.structure("test_structure.in")
 
 box.simulation.settings("test_settings.in")
-timestep = 0.01
-desc1 = "testing"
-box.simulation.equilibrate(10000,
-                           timestep,
-                           2,
-                           'langevin',
-                           output_steps=1000,
-                           description=desc1)
 
-view_path = "~/ovito/build/bin/ovito"
+view_path = "~/ovito-basic-3.5.4-x86_64/bin/ovito"
 box.simulation.view(view_path, "test_structure.in")
+
 # box.simulation.run(folder="long_biax_test")
 # add mpi=7 argument to run with mpi
 # box.simulation.run(folder="comp_test")

@@ -27,7 +27,13 @@ box.interactions.newType("b", 1.0,
                          ('a,b', (0.1, 0.2, 1.5, (1, 1.0, 0.1))))
 
 box.meanfield.parameters("test",
+                         "test_guess",
                          [5,5,5],
+                         2.21,
                          'cubic',
-                         [("a", 0.1), ("b", 0.9), ("a", 0.1)],
-                         [("a", 0.15), ("b", 0.8), ("a", 0.15)])
+                         0.0001,
+                         '2 3 5 2',
+                         [("a", 0.1), ("b", 0.9), ("a", 0.1)])
+
+box.meanfield.model_field("test_model", 1, [[0.0, 0.0, 0.0], 
+                                            [0.5, 0.5, 0.5]])

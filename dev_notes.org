@@ -1,19 +1,46 @@
 * Development Notes
+** Calculating the Flory-Huggins parameter
+   Reference: Chremos, Nikoubashman and Panagiotopolous 2014
+   Algorithm: http://www.cchem.berkeley.edu/chem195/_l_j___n_p_t_8m.html
+    1. Set up an initial configuration of M=8192 beads in a cuboidal box.
+       Place A beads in one half and B beads in the other half.
+
+    2. Define temperature and maximal particle/volume displacements.
+       Set the total number of cycles.
+       Define the sampling frequency.
+       Set external pressure to 0, corresponding to atmospheric conditions.
+
+    3. Calculate the initial Lennard-Jones energy. 
+      
+    FOR I IN RANGE: NUMBER OF CYCLES TO REACH EQULIBRIUM:
+    4. Perform M attempts at three types of moves.
+      a) 60% : Random displacements
+      b) 20% : Particle identity swaps
+      c) 20% : Random changes in volume     
+
+    FOR I IN RANGE: NUMBER OF CYCLES TO SAMPLE RESULTS:
+    5. Perform M attempts at three types of moves.
+       a) 60% : Random displacements
+       b) 20% : Particle identity swaps
+       c) 20% : Random changes in volume
+       
+       For every step defined in sampling frequency, calculate the number fraction of the A block.
+       Add the number fraction to a running total.
+
+    6. Average the number fraction with the number of samples taken.
+
+    -----------------------------------------------------------------------------------------------------------
+       
+    For displacement and particle identity swaps:
+      Accept the trial moves with the probability P(MOVE) = min{1, exp(-beta/change_in_energy)}
+    For volume:
+      Perform a change in volume and scale all particle coordinates by f = (new_volume/old_volume)^(1/3).
+      Accept the trial moves with the probability P(MOVE) = min{1, exp(-beta/change_in_enthalpy)}
+
 ** ANALYSIS
 *** Methods of obtaining stress-strain curves
 **** Current method
      Simply plotting the pressure against the extension.
 **** Potential methods
      *The Irving-Kirkwood Formalism*     
-** Potential Structures
-** Bugs
-*** DONE BUG: undetected beads that are too close
-- Defining features of the bug:
-  a) The errors themselves have no commonalities aside from that they are more frequent in dense systems.
-  b) *THE BUG DOES NOT APPEAR WHEN A SINGLE WALK IS GENERATED WITHIN THE BOX.*
-     *IT EXCLUSIVELY OCCURS WITH MULTIPLE WALKS*!!!
-- Does the bug scale with density? 
-  *YES*
-*** TODO BUG: issue with the bead types detection
-   The bug occurs because the random walk algorithm is fixed at 1,
-   so setting a bead type as "2" will cause it to reaise a key error.
+

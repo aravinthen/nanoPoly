@@ -1,0 +1,25 @@
+LAMMPS (7 Aug 2019)
+  using 1 OpenMP thread(s) per MPI task
+#-----------------------------------------------------------------------------------
+# NANOPOLY - POLYMER NANOCOMPOSITE SIMULATION FILE
+# Full project files can be found at: https://github.com/aravinthen/nanoPoly
+#-----------------------------------------------------------------------------------
+# FILENAME: test_settings.in
+# DATE: 2021-10-18
+# OVERVIEW:
+#    Number of polymer chains:       5
+#    Number of bonded crosslinks:    0
+#    Number of unbonded crosslinks:  0
+#    Number of grafted chains:       0
+#    Nanostructure:                  None
+#-----------------------------------------------------------------------------------
+
+variable structure index test_structure2.in
+variable simulation index test_settings.in
+
+# Initialization settings
+units              lj
+boundary           p p p
+atom_style         bond
+log                log.${simulation}.txt
+log                log.test_settings.in.txt
