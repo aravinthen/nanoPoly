@@ -1,28 +1,25 @@
 format  1  0                                                           
+                                                                       
 MONOMERS                                                               
 N_monomer                                                              
         2                                                      
 kuhn                                                                   
-  1.0000000E+00  1.0000000E+00  1.0000000E+00                          
+  1.0000000E+00  1.0000000E+00                                         
                                                                        
 CHAINS                                                                 
 N_chain                                                                
         1                                                   
 N_block                                                                
-        3                                                      
+        2                                                      
 block_monomer                                                          
-                      1              2              1                                                
+                      1              2                                                
 block_length                                                           
-                      1.000000E-01              9.000000E-01              1.000000E-01                                                 
+                      2.500000E-01              7.500000E-01                                                 
                                                      
-SOLVENTS                                                               
-N_solvent                                                              
-              0                                                        
-                                                                       
 COMPOSITION                                                            
 ensemble                                                               
               0                                                        
-phi_chain(1)                                                 
+phi                                                                    
   1.0000000E+00                                                        
                                                                        
                                                      
@@ -30,48 +27,67 @@ INTERACTION
 interaction_type                                                       
           'chi'                                                        
 chi                                                                    
-        2.210000E+00                                                          
+        2.000000E+01                                                          
                                                                        
                                                      
 UNIT_CELL                                                              
 dim                                                                    
               3                                                        
 crystal_system                                                         
-        cubic                                                      
+        'cubic'                                                    
 N_cell_param                                                           
               1                                                        
 cell_param                                                             
-  2.1276672E+00                                                        
+  1.9                                                        
                                                                        
 DISCRETIZATION                                                         
 ngrid                                                                  
              5             5             5     
 chain_step                                                             
-        1.000000E-04                                                        
+        1.000000E-02                                                   
                                                                        
 BASIS                                                                  
 group_name                                                             
-     '2 3 5 2'                                                    
+     'I m -3 m'                                                    
+                                                                       
+KGRID_TO_RGRID                                                         
+input_filename                                                         
+        'test_kgrid'                                            
+output_filename                                                        
+        'test_rgrid'                                            
+                                                                       
+RGRID_TO_FIELD                                                         
+input_filename                                                         
+        'test_rgrid'                                            
+output_filename                                                        
+        'test_rho.in'                                              
+                                                                       
+RHO_TO_OMEGA                                                           
+input_filename                                                         
+        'test_rho.in'                                              
+output_filename                                                        
+        'test.omega.in'                                            
                                                                        
 ITERATE                                                                
 input_filename                                                         
-          test_guess                                            
+          'test.omega.in'                                          
 output_prefix                                                          
-             'out/'                                                    
+          ''                                                           
 max_itr                                                                
             100                                                  
 error_max                                                              
-            1.000000E+00                                                
-domain                                                                 
+            1.000000E-05                                                
+domain                                           n                      
               T                                                        
 itr_algo                                                               
            'NR'                                                        
 N_cut                                                                  
-            100                                                     
+            80                                                   
                                                                        
 FIELD_TO_RGRID                                                         
 input_filename                                                         
-            'out/rho'                                                  
+            'rho'                                                  
 input_filename                                                         
             'rgrid'                                                    
+                                                                       
 FINISH
