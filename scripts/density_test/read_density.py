@@ -1,4 +1,4 @@
-# Program Name: read_density.py
+s# Program Name: read_density.py
 # Author: Aravinthen Rajkumar
 # Description: Example of reading a density into nanopoly
 

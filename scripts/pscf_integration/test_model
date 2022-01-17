@@ -3,7 +3,7 @@ parameter_file        test
 output_file           test_kgrid            
 structure_type        particle                     
 core_monomer          0                  
-coord_input_style     basis                        
+coord_input_style     basis                       
 N_particles           2            
 particle_positions                                 
         0.0   0.0   0.0             

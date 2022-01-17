@@ -55,22 +55,32 @@ class MeanField:
         for i in range(3):
             if self.polylattice.cellnums % unit[i] != 0:
                 raise SystemError("Unit cell indices must divide the polylattice box.")
-
-        types = set()
-        for i in args:
-            for j in i:
-                types.add(j)
-        N_monos = len(list(types))
         
-        if N_monos != 3:
-            print(f"You're defining three kuhn lengths by default, stupid! There should be {N_monos} 1.0000000E+00s under kuhn in the param file.")
+        chains = []
+        types = dict()
+        for i in args:
+            single_chain = []
+            for j in i:
+                for k in j:
+                    if len(j) != 3:
+                        single_chain.append((k[0], 1.0, k[2]))
+                        types[k[0]] = 1.0
+                    else:
+                        single_chain.append(k)
+                        types[k[0]] = k[1]
+
+                    
+            chains.append(single_chain)
+
+        N_monos = len(list(types))
+        mono_string = "\t" + "\t".join([format(types[i], "E") for i in types])
         
         self.param_file = pname
         self.kgrid_file = pname + "_kgrid"
         self.rgrid_file = pname + "_rgrid"
         self.rho_file = pname + "_rho.in"
         self.omega_file = pname + ".omega.in"
-        f = open(self.param_file, "w")           
+        f = open(self.param_file, "w")        
         f.write(f"\
 format  1  0                                                           \n\
                                                                        \n\
@@ -80,7 +90,7 @@ MONOMERS                                                               \n\
 N_monomer                                                              \n\
         {N_monos}                                                      \n\
 kuhn                                                                   \n\
-  1.0000000E+00  1.0000000E+00                                         \n\
+  {mono_string}                                                        \n\
                                                                        \n\
 CHAINS                                                                 \n\
 N_chain                                                                \n\
@@ -91,13 +101,13 @@ N_chain                                                                \n\
         # no indexing if there's only one chain within the system
 
         if num_chains == 1:
-            n_block = len(args[0])
+            n_block = len(chains[0])
             block_monomer = ""
             block_length = ""
-            for bead_type in args[0]:
+            for bead_type in chains[0]:
                 conv_type = self.polylattice.interactions.typekeys[bead_type[0]]
                 block_monomer += f"              {conv_type}"
-                num = format(bead_type[1], "E")
+                num = format(bead_type[2], "E")
                 block_length +=  f"              {format(num)}"
 
             f.write(f"\
@@ -111,7 +121,7 @@ block_length                                                           \n\
 
         else:
             chain_num = 0
-            for chain in args:
+            for chain in chains:
                 chain_num += 1
                 n_block = len(chain)
                 block_monomer = ""
@@ -141,7 +151,7 @@ ensemble                                                               \n\
 ")
 
         chain_num = 0
-        for chain in args:
+        for chain in chains:
             chain_num += 1            
             f.write(f"\
 phi                                                                    \n\
@@ -292,11 +302,10 @@ finish                                             \n\
             unit = self.unit
 
         count = 0
-        with open(density_file, 'r') as f:
             # check if the number of beads in file match with the number of beads in interaction data
-            file_beads = len(f.readline().strip().split("\t"))
-            if file_beads != self.polylattice.interactions.num_types:                
-                raise EnvironmentError("Defined bead types and file bead types do not match.")
+#             file_beads = len(f.readline().strip().split("\t"))
+#             if file_beads != self.polylattice.interactions.num_types:
+#                 raise EnvironmentError("Defined bead types and file bead types do not match.")
 
         unit_index = []
         with open(density_file, 'r') as f:
@@ -306,12 +315,26 @@ finish                                             \n\
 
             # incrementally
             for line in f:
-                datum = line.strip().split("\t")
+                datum = line.strip().split()
+
+                not_numeric = False
+                                
+                for i in datum:
+                    if not i[0].isnumeric():
+                        not_numeric = True
+                        break
+                
+                if not_numeric == True:
+                    continue
+
+                if len(datum) == 1:
+                    continue
+                    
+                if [int(float(i)) for i in datum] == unit:
+                    continue
+
                 density_data = np.array([float(i) for i in datum])
-                
-                if any(i < 0.0 for i in density_data):
-                    raise EnvironmentError("Unphysical densities contained with density file.")
-                
+                    
                 unit_index.append([[x,y,z], density_data])
                 
                 x+=1                

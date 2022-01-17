@@ -4,7 +4,7 @@ MONOMERS
 N_monomer                                                              
         2                                                      
 kuhn                                                                   
-  1.0000000E+00  1.0000000E+00                                         
+  	1.000000E+00	1.000000E+00                                                        
                                                                        
 CHAINS                                                                 
 N_chain                                                                
@@ -14,7 +14,7 @@ N_block
 block_monomer                                                          
                       1              2                                                
 block_length                                                           
-                      2.500000E-01              7.500000E-01                                                 
+                      4.000000E-01              6.000000E-01                                                 
                                                      
 COMPOSITION                                                            
 ensemble                                                               
@@ -27,7 +27,7 @@ INTERACTION
 interaction_type                                                       
           'chi'                                                        
 chi                                                                    
-        2.000000E+01                                                          
+        3.000000E+01                                                          
                                                                        
                                                      
 UNIT_CELL                                                              
@@ -38,11 +38,11 @@ crystal_system
 N_cell_param                                                           
               1                                                        
 cell_param                                                             
-  1.9                                                        
+  1.923202                                                        
                                                                        
 DISCRETIZATION                                                         
 ngrid                                                                  
-             5             5             5     
+             15             15             15     
 chain_step                                                             
         1.000000E-02                                                   
                                                                        
@@ -76,13 +76,13 @@ output_prefix
 max_itr                                                                
             100                                                  
 error_max                                                              
-            1.000000E-05                                                
-domain                                           n                      
+            1.000000E-08                                                
+domain                                                                 
               T                                                        
 itr_algo                                                               
            'NR'                                                        
 N_cut                                                                  
-            80                                                   
+            95                                                   
                                                                        
 FIELD_TO_RGRID                                                         
 input_filename                                                         
