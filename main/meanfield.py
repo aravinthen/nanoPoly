@@ -291,7 +291,9 @@ finish                                             \n\
     def density_file(self,
                      density_file,
                      unit=None):
-        
+        """
+        subdivision: allows the unit cell to be split into multiple polylattice
+        """
         if self.polylattice.interactions.num_types == 0:
             raise EnvironmentError("Types must be defined before setting densities.")
 
@@ -307,13 +309,15 @@ finish                                             \n\
 #             if file_beads != self.polylattice.interactions.num_types:
 #                 raise EnvironmentError("Defined bead types and file bead types do not match.")
 
-        unit_index = []
+        unit_index = [] 
+        # this process essentially finds the array indices of the line-by-line density file.
+        # first argument is the index of the density box
+        # second argument is the density at said box.
         with open(density_file, 'r') as f:
             x = 0
             y = 0
             z = 0
 
-            # incrementally
             for line in f:
                 datum = line.strip().split()
 
@@ -333,30 +337,31 @@ finish                                             \n\
                 if [int(float(i)) for i in datum] == unit:
                     continue
 
-                density_data = np.array([float(i) for i in datum])
-                    
+                density_data = np.array([float(i) for i in datum])                    
                 unit_index.append([[x,y,z], density_data])
-                
+               
                 x+=1                
                 if x > unit[0]-1:
                     x = 0
-                    y +=1
+                    y += 1
                 if y > unit[1]-1:
                     x = 0
                     y = 0
-                    z +=1
+                    z += 1
                     
                 count+=1
 
         num_types = np.size([unit_index[0][-1]])
         density_fields = [np.zeros(unit) for i in range(num_types)]
         
-        for i in unit_index:
+        # this converts the density list calculated above into a pair of arrays.
+        for i in unit_index:    
             for j in range(num_types):
                 density_fields[j][i[0][0], i[0][1], i[0][2]] = i[-1][j]
-        # now you have a list of arrays that contain the density information PER type
 
-
+        # fills in a single unit cell at each point
+        # x,y,z = the coordinates where a unit cell begins or repeats itself.
+        # i, j, k = the coordinates of the unit cell that are being repeated over
         for x in range(0, self.polylattice.cellnums, unit[0]):
             for y in range(0, self.polylattice.cellnums, unit[1]):
                 for z in range(0, self.polylattice.cellnums, unit[2]):
@@ -366,6 +371,7 @@ finish                                             \n\
                                 cell = [x+i,y+j,z+k]
                                 density_data = [data[i,j,k] for data in density_fields]
                                 self.polylattice.index(cell).densities = density_data                                   
+
         print(f"{count} density values read into box.")
         
         self.density = True

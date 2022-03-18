@@ -13,8 +13,6 @@ import numpy as np
 import math as m
 import time
 import random
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 import sys
 sys.path.append(".")
@@ -71,7 +69,7 @@ class PolyLattice:
             self.beads = []
 
             
-    def __init__(self, boxsize, cellnums=1.0, density = 1.0):
+    def __init__(self, boxsize, cellnums=1.0):
         """        
         boxsize: length of a box in one dimension
         cellnums: Number of cells in one-dimension.
@@ -79,13 +77,14 @@ class PolyLattice:
         """
         self.boxsize = boxsize 
         self.cellnums = cellnums
-        self.density = density
         self.cellside = self.boxsize/self.cellnums
         self.celltotal = self.cellnums**3
         
         self.crossings = np.zeros((3, 1)) # number of crossings in each direction, [x, y, z]
                                           # encapsulates boundary conditions
 
+        self.retractions = 0 # the number of times a chain has had to retract in the course of a random walk
+        self.dead_walks = 0
 
         # attached libraries
         self.mdsim = MDSim(self) # the simulation class
@@ -131,10 +130,14 @@ class PolyLattice:
         self.num_walk_beads = 0
         
         self.num_grafts = 0
+
+        self.graft_ids = []
         self.graft_beads = 0
         self.graft_coords = [] # Contains the coordinates of the bead the graft is attached to,
                                # as well as the first bead on that grafted chain. This is ONLY
                                # used to build the relevant bond!
+
+        self.graft_fail = False # this is to 
 
         # global counts
         self.num_bonds = 0        
@@ -219,16 +222,120 @@ class PolyLattice:
 
         return [bead for cell in surround_ind for bead in self.index(cell).beads]
 
+    def reset(self, keep_types=False):
+        """Completely resets a box into it's initial state"""
+        
+        # save the important arguments
+        cbox = self.boxsize
+        ccellnum = self.cellnums
+        ccellnum = self.cellnums
+
+        if keep_types == True:
+            old_interactions = self.interactions
+
+        # full reset of parameters
+        self.boxsize = cbox
+        self.cellnums = ccellnum
+        self.cellside = self.boxsize/self.cellnums
+        self.celltotal = self.cellnums**3        
+        self.crossings = np.zeros((3, 1)) # number of crossings in each direction, [x, y, z]
+                                          # encapsulates boundary conditions
+
+        # attached libraries
+        self.mdsim = MDSim(self) # the simulation class
+        self.check = Check(self) # the Check subclass
+        self.percolation = Percolation(self) # the Percolation class
+        self.meanfield = MeanField(self)
+        
+        # initializing the interactions class 
+        # this is initialised as it's own class due to legacy code
+        if keep_types == False:
+            self.interactions = Structure.Interactions(self.cellside)
+        else:
+            self.interactions = old_interactions
+        # bond details
+        self.bonds = None # 
+
+        # crosslink details
+        self.crosslinks_loc = []
+        # unbonded crosslinks
+        self.cl_unbonded = False # Will be set to true once unbonded crosslinks are added
+        self.cl_bonding = None # saves the bond configuration for use in the simulation file
+        
+        self.random_walked = False
+        # note: For info dictionaries the starting values all begin at zero.
+        #       This is so that the beads are given the correct values for atom number in the
+        #       simulation directory.
+        
+        self.walkinfo = {0:0}  # this is supposed to store the walk as well as the number of
+                               # beads in that walk.
+                               # used to control the bond writing process in the simulation class
+        self.uclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
+        self.bclinfo = {0:0}   # the same as above, but for unbonded crosslink structures
+
+
+        self.nanostructure = None
+        
+        # counts
+        self.num_uclstructs = 0 # the number of unbonded crosslink structures
+        self.num_uclbeads = 0
+        
+        self.num_bclstructs = 0 # the number of bonded crosslink structures present
+        self.num_bclbeads = 0 
+
+        self.num_walks = 0
+        self.num_walk_beads = 0
+        
+        self.num_grafts = 0
+        self.graft_beads = 0
+        self.graft_coords = [] # Contains the coordinates of the bead the graft is attached to,
+                               # as well as the first bead on that grafted chain. This is ONLY
+                               # used to build the relevant bond!
+
+        # global counts
+        self.num_bonds = 0        
+        self.num_beads = 0
+    
+        # this bit of code builds the cells within the lattice.
+        self.Cells = []
+
+        # when the simulation library is called, the structure is considered complete.
+        self.structure_ready = False
+        
+        # for i in range(self.cellnums):
+        #     for j in range(self.cellnums):
+        #         for k in range(self.cellnums):
+        #             # fastest index
+        #             cell_positions = np.array([round(self.cellside*i, 16),
+        #                                        round(self.cellside*j, 16),
+        #                                        round(self.cellside*k, 16)])
+        #             self.Cells.append(self.Cell(i, j, k, cell_positions, self.cellside))
+
+        index_list = ((i,j,k)
+                      for i in range(self.cellnums)
+                      for j in range(self.cellnums)
+                      for k in range(self.cellnums))
+        
+        for index in index_list:
+            cell_positions = np.array([round(self.cellside*index[0], 16),
+                                       round(self.cellside*index[1], 16),
+                                       round(self.cellside*index[2], 16)])
+            self.Cells.append(self.Cell(index[0], index[1], index[2], cell_positions, self.cellside))
+
+        print("Box reset successfully.")
+
 
     #-----------------------------------------------------------------------------------------------
     # # # # # # # # # # # # # # # # # # # # # KEY ALGORITHM # # # # # # # # # # # # # # # # # # # # 
     #-----------------------------------------------------------------------------------------------
     def randomwalk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,        
-                   style='fene', phi=None, theta=None, cell_num=None, starting_pos=None,
+                   style='fene', phi=None, theta=None, cell_num=None, 
+                   starting_pos=None,
+                   sequence_range = 150,
                    density_mc=False, meanfield=False,
                    end_pos=None,
-                   soften=True,
-                   termination=None, initial_failures=10000, walk_failures=10000):
+                   soften=True, srate=0.99, suppress=False, danger = 1.0,
+                   termination='soften', initial_failures=10000, walk_failures=10000):
         """index_c
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -247,10 +354,13 @@ class PolyLattice:
         PARAMETER - bead_types: defines and identifies the beads and their types.
                     MUST BE A DICTIONARY.
         OPTION -    termination: THREE OPTIONS - a) None, b) Retract and c) Break
+        OPTION -    grafting: used if the generated random walk will be grafted onto something.
+        OPTION -    srate: the rate at which the minimum distance requirement softens
+        OPTION -    sequence_range: the range at which a bead's type is selected when running mc-biased random walks
                     
         Notes: Nested functions prevent the helper functions from being used outside of scope.       
         """        
-
+        
         if self.structure_ready == True:
             raise EnvironmentError("Structures cannot be built or modified when simulation procedures are in place.")
         
@@ -260,7 +370,15 @@ class PolyLattice:
 
         if self.meanfield.density != True and meanfield != False:
             raise EnvironmentError("Density file has not been assigned.")
-        
+
+        if srate == 1.0:
+            print("Setting srate to unity means that the softening rate of the potential will stay the same.")
+            print("This will probably lead to the program getting stuck. Rerun the program with an s-rate")
+            print("that is lower than unity.")
+            print("(This particular mistake once cost the author of this program almost seventeen hours of")
+            print("compute time.)")
+            raise EnvironmentError("Program terminated.")
+
         def rand_distance(length, dimension):
             """
             Used to generate freely jointed chain models. This is the default option.
@@ -363,8 +481,8 @@ class PolyLattice:
             
             return new_pos
         
-        #-------------------------------------------------------------------------------------------
-        
+        #-------------------------------------------------------------------------------------------    
+
         # bond type dictionary
         if self.bonds == None:
             self.bonds = {}
@@ -387,15 +505,19 @@ class PolyLattice:
             if i not in self.interactions.used_types:
                 self.interactions.used_types.append(i)
 
-        mc_issues = 1
-        if starting_pos != None:
-            while mc_issues > 0:        
+        if starting_pos != None:            
+            invalid_start = True
+            total_failure = False
+            failure = 0
+            while invalid_start:
                 maxdis = self.cellside*self.cellnums
                 for i in range(len(starting_pos)):
                     if starting_pos[i] < 0:
                         starting_pos[i] = maxdis + starting_pos[i]
                     if starting_pos[i] > maxdis:
                         starting_pos[i] = starting_pos[i] - maxdis
+
+                    # nudge this out the way slightly
                     if starting_pos[i] == maxdis:
                         starting_pos[i] = 0.9999*maxdis
 
@@ -414,30 +536,43 @@ class PolyLattice:
 
                     # check the sigma distance
                     # the lhs is the distance between the bead and the neighbour
-                    distance = np.linalg.norm(starting_pos - real_j)
+                    distance = np.round(np.linalg.norm(starting_pos - real_j), 5)
 
                     check = mini*self.interactions.return_sigma(bead_sequence[0], j[2])
                     if distance < check:
                         issues+=1
                         break # stop checking neighbours
 
-                # monte carlo check
-                if meanfield == True:
-                    random_num = np.random.uniform(0,1)
-                    density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
-                    if random_num > density:
-                        mc_issues+=1
+                # monte carlo check NOT required, but will be a necessary component of all randomly generated positions.
 
-                if density_mc == True:
-                    random_num = np.random.uniform(0,1)
-                    box_density = self.num_beads/self.boxsize**3
-                    cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
-                    print(cell_density, box_density)
-
+                # issues should only occur the provided position is too close to another bead. 
+                # softening can be employed here to make position selection easier.
                 if issues>0:
-                    print("Provided starting position is too close to another bead.")
-                    print("Please choose a more appropriate position.")
-                    raise Exception("Program terminated.")
+                    invalid_start = True
+                    failure+=1
+
+                    if failure > initial_failures:
+                        if soften == True:
+                            total_failure = False
+                            mini = srate*mini
+                            failure = 0
+                            issues = 0
+                            if suppress == False:
+                                print(f"Failure tolerance reached at random walk {self.num_walks}.")
+                                print(f"Softening minimum requirement. Current minima: {mini}")
+
+                        else:
+                            total_failure = True
+                            invalid_start = False
+
+                else:
+                    invalid_start = False
+                    failure = 0
+
+            if total_failure == True:
+                print("Provided starting position is too close to another bead.")
+                print("Please choose a more appropriate position.")
+                raise Exception("Program terminated.")
                  
             bead_data = [ID,
                          0,
@@ -458,8 +593,6 @@ class PolyLattice:
                                          random.randrange(0, self.cellnums),
                                          random.randrange(0, self.cellnums)])
                 
-            
-
             cell_pos = self.index(current_cell).position
             cell_bound = cell_pos + self.cellside
             
@@ -503,7 +636,6 @@ class PolyLattice:
                     random_num = np.random.uniform(0,1)
                     box_density = self.num_beads/self.boxsize**3
                     cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
-                    print(cell_density, box_density)
 
                 if issues > 0:                    
                     invalid_start = True
@@ -511,12 +643,14 @@ class PolyLattice:
                     
                     if failure > initial_failures:                        
                         if soften == True:
-                            print(f"Failure tolerance reached at random walk {self.num_walks}.")
-                            print(f"Softening minimum requirement by 1%. Current minima: {mini}")
                             total_failure = False
-                            mini = 0.99*mini
+                            mini = srate*mini
                             failure = 0
                             issues = 0
+                            if suppress == False:
+                                print(f"Failure tolerance reached at random walk {self.num_walks}.")
+                                print(f"Softening minimum requirement. Current minima: {mini}")
+
                         else:
                             total_failure = True
                             invalid_start = False
@@ -550,12 +684,26 @@ class PolyLattice:
         bond = mini*sigma # the minimum of the LJ potential
         i = 1
         current_pos = starting_pos
-        
+
+        danger_mode = False
         while i < numbeads:            
             too_close = True # used to check if the cell is too close
             generation_count = 0 # this counts the number of random vectors generated.
-                                 # used to raise error messages.
-            bead_type = bead_sequence[(i % len(bead_sequence))]
+                                 # used to raise error messages
+                
+            # manually slice the list and build a subsequence from which the first bead is that of the current index
+            #            bead_subseq = [bead_sequence[(i+j)%len(bead_sequence)] for j in range(sequence_range) 
+            #                           if (i+j) < last_element else bead_sequence[(last_element+j)%len(bead_sequence)]
+
+            last_element = len(bead_sequence) - sequence_range-1 # the last element before the subsequence terminates
+            bead_subseq = []                 
+
+            for j in range(sequence_range):
+                if i+j > last_element:
+                    bead_subseq.append(bead_sequence[(last_element+j)])
+                else:
+                    bead_subseq.append(bead_sequence[(i+j)])
+                    
             while too_close:
                 # loop works like this:
                 #    0. generates trial position
@@ -568,17 +716,27 @@ class PolyLattice:
                     if end_pos == None:
                         trial_pos = new_position(current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
                     else:
-                        trial_pos = forced_new_position(end_pos, i, numbeads, 
-                                                        current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
+                        trial_pos = forced_new_position(end_pos,
+                                                        i,
+                                                        numbeads, 
+                                                        current_pos,
+                                                        bond,
+                                                        1,
+                                                        self.cellside*self.cellnums,
+                                                        phi,
+                                                        theta) # new posn
                         
                     not_valid = self.index(self.which_cell(trial_pos)).forbidden
                     
                 previous = current_pos
                 current_pos = trial_pos
                 
+                bead_type = bead_subseq[0]
+
                 neighbours = self.check_surroundings(current_pos)
                 issues = 0
                 index_c = self.which_cell(current_pos)
+                
                 # neighbor checking takes place here.
                 for j in neighbours:            
                     index_n = self.which_cell(j[-1])
@@ -600,15 +758,14 @@ class PolyLattice:
                 # monte carlo check
                 if meanfield == True:
                     random_num = np.random.uniform(0,1)
-                    density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
-                    if random_num > density:
+                    avg_density = sum([self.index(index_c).densities[self.interactions.typekeys[i]-1] for i in bead_subseq])/len(bead_subseq)
+                    if random_num > avg_density:
                         issues+=1
 
                 if density_mc == True:
                     random_num = np.random.uniform(0,1)
                     box_density = self.num_beads/self.boxsize**3
                     cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
-                    print(cell_density, box_density)
                     
                 if issues > 0:      
                     too_close = True
@@ -637,31 +794,100 @@ class PolyLattice:
                                          style=style,
                                          bead_sequence=bead_sequence,
                                          restart=restart,
+                                         sequence_range = sequence_range,
                                          termination=termination)                    
                         return 0
                     
                     elif termination == "retract":
-                        print(f"Retracting at bead {i} of random walk {ID}")                        
-                        # adjust walk positions                        
-                        i = i - 1
-                        self.num_beads -= 1
+                        # pick a number of beads that will be deleted
+
+                        self.retractions += 1
+                        # adjust walk positions
                         
-                        progress = self.walk_data(ID)
-                        bad_bead = progress[-1]
-                        current_cell = self.which_cell(bad_bead[-1])
+                        if i == 1:
+                            # conditions for when the random walk returns to the initial bead
+                            # here, retraction is not possible: two cases must be considered
+                            # 1. CASE 1: Walk is standalone.
+                            #            Here, the walk should be cancelled and resumed elsewhere.
+                            #            One way to do this is via recursion.
+                            # 2. CASE 2: Walk is part of a graft.
+                            #            In this situation a new position must be found for the graft, but constrained to 
+                            #            the region in which the grafting target is found.
 
-                        self.index(current_cell).beads.remove(bad_bead)
 
-                        progress = self.walk_data(ID)
-                        current_pos = progress[-1][-1]
+
+                            # delete starter bead
+                            progress = self.walk_data(ID)
+                            bad_bead = progress[-1]
+                            current_cell = self.which_cell(bad_bead[-1])
+                            self.index(current_cell).beads.remove(bad_bead)
+
+                            self.num_beads -= 1
+                            self.num_walk_beads -= 1 # the individual count beads that make up a walk
+
+                            # redo random walk
+                            print("Walk has retracted to first bead - restarting random walk.")
+                            self.randomwalk(numbeads,
+                                            Kval,
+                                            cutoff,
+                                            energy,
+                                            sigma,
+                                            bead_sequence,
+                                            mini=1.12234,
+                                            style='fene',
+                                            phi=phi,
+                                            theta=theta,
+                                            cell_num=cell_num, 
+                                            starting_pos=list(starting_pos),
+                                            sequence_range = sequence_range,
+                                            density_mc=density_mc,
+                                            meanfield=meanfield,
+                                            end_pos=end_pos,
+                                            soften=soften, 
+                                            srate=srate,
+                                            suppress=suppress,
+                                            danger = danger,
+                                            termination=termination,
+                                            initial_failures=initial_failures,
+                                            walk_failures=walk_failures)
+                            return 0
+                        else:
+                            
+                            deletion = random.randint(1, int(0.5*i))
+                            initial = i
+
+                            for bead in range(deletion):
+                                progress = self.walk_data(ID)
+                                bad_bead = progress[-1]
+                                current_cell = self.which_cell(bad_bead[-1])
+
+                                self.index(current_cell).beads.remove(bad_bead)                        
+
+                                new_progress = self.walk_data(ID)          
+                                current_pos = new_progress[-1][-1]
+                                current_cell = self.which_cell(current_pos)
+
+                                i -= 1
+                                self.num_beads -= 1
+                                self.num_walk_beads -= 1
+
+                            print(f"Retracting at bead {initial} of random walk {ID}. Current bead: {i}")
+
+                            if danger_mode == True:
+                                termination = 'soften'
+                                mini = 1.12234
+                                danger_mode = False
 
                     elif termination == "soften":
-                        print(f"Failure tolerance reached at bead walk {self.num_beads}.")
-                        print(f"Softening minimum requirement by 1%. Current minima: {mini}")
-                        mini = 0.99*mini
+                        if suppress == False:
+                            print(f"Failure tolerance reached at bead walk {self.num_beads}. Softening minimum requirement. Current minima: {mini}")
+                            mini = srate*mini
+
+                            if mini < danger:
+                                danger_mode = True
+                                termination = 'retract'
+
                     else:                        
-                        raise Exception("Program terminated.")
-                        print("")
                         print("Warning for Random Walk ID: " + str(ID))
                         print("The system has now generated %d unsuccessful positions for this walk." % (generation_count))
                         print("It's very likely that the random walk has either become trapped or")
@@ -670,13 +896,14 @@ class PolyLattice:
                         print("a) a fewer number of atoms,")
                         print("b) a larger amount of lattice space,")
                         print("c) a smaller step distance.")
+                        raise Exception("Program terminated.")
                         
                 # -----------------------------------------------------------------------------------
+
 
             mini = 1.12234
             current_pos = trial_pos
             current_cell = self.which_cell(current_pos)
-
 
             # 0: random walk this belongs to
             # 1: number of the bead (on the random walk)
@@ -698,7 +925,7 @@ class PolyLattice:
                          bond_type,
                          self.num_beads,
                          current_pos]
-            
+
             self.num_walk_beads += 1
             self.num_beads += 1
             self.index(current_cell).beads.append(bead_data)
@@ -712,12 +939,15 @@ class PolyLattice:
         self.walkinfo[ID] = self.num_walk_beads
         return 1    
     
-    def graft_chain(self, starting_bead, num_beads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, 
+    def graft_chain(self, starting_bead, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, 
                     starting_distance = None,
                     style='fene', phi=None, theta=None, cell_num=None,
                     density_mc = None, meanfield=False,
-                    soften=True,
-                    termination=None, initial_failures=10000, walk_failures=10000):
+                    soften=True, srate=0.99, suppress=False,
+                    sequence_range = 1,
+                    termination='soften', danger=0.6,
+                    retraction_limit = 10,
+                    initial_failures=10000, walk_failures=10000):
         """
         This method is used to grow extra beads at a particular point in a given chain.
         Intended to study the effects of different chain architectures on macroscopic properties.
@@ -847,7 +1077,6 @@ class PolyLattice:
                 check = mini*self.interactions.return_sigma(bead_sequence[0], j[2])
                 if distance < check:                        
                     issues += 1
-                    print(issues)
                     break
 
             # monte carlo check
@@ -861,40 +1090,320 @@ class PolyLattice:
                 too_close = True
                 current_pos = previous
                 generation_count+=1
+
                 if generation_count % initial_failures == 0:
-                    print("Position for graft bead not found. Consider reattempting with a sparser box.")
-                    print("Graft unsuccessful.")
-                    raise Exception("Program terminated.")            
+                    if soften == True:
+                        mini = srate*mini
+                        if suppress == False:
+                            print(f"Failure tolerance reached when grafting at {self.num_beads}.")
+                            print(f"Softening minimum requirement. Current minima: {mini}")
+
+                    else:
+                        print("Position for graft bead not found. Consider reattempting with a sparser box.")
+                        print("Graft unsuccessful.")
+                        raise Exception("Program terminated.")            
             else:
                 too_close = False
 
+        # The full data entry for keeping track of the bead.
+        ID = self.num_walks + 1
+        bead_data = [ID,
+                     0,
+                     bead_sequence[0],
+                     bond_type,
+                     self.num_beads,
+                     current_pos]
+
+        self.num_beads += 1
+        self.num_walk_beads += 1 # the individual count beads that make up a walk
+        self.index(self.which_cell(current_pos)).beads.append(bead_data)
+
         # the algorithm should by now have returned a valid position for the random walk. (or failed)
         # now, all that's left is to run a random walk from this position.
-        graft_pos = current_pos
+        mini = 1.12234 # resetting minimum
+        
+        # Begin loop here.
+        bond = mini*sigma # the minimum of the LJ potential
+        i = 1
+        
+        retraction_count = 0 # used when retraction occurs at the first bead        
+        danger_mode = False
+        while i < numbeads:            
+            too_close = True # used to check if the cell is too close
+            generation_count = 0 # this counts the number of random vectors generated.
+                                 # used to raise error messages
+                
+            # manually slice the list and build a subsequence from which the first bead is that of the current index
+            #            bead_subseq = [bead_sequence[(i+j)%len(bead_sequence)] for j in range(sequence_range) 
+            #                           if (i+j) < last_element else bead_sequence[(last_element+j)%len(bead_sequence)]
 
-        self.randomwalk(num_beads,
-                        Kval,
-                        cutoff,
-                        energy,
-                        sigma,
-                        bead_sequence,
-                        mini=1.12234,
-                        style='fene',
-                        phi=phi,
-                        theta=theta,
-                        starting_pos=list(graft_pos),
-                        density_mc=density_mc, 
-                        meanfield=meanfield,
-                        termination=None,
-                        initial_failures=initial_failures,
-                        walk_failures=walk_failures)
+            last_element = len(bead_sequence) - sequence_range-1 # the last element before the subsequence terminates
+            bead_subseq = []
+            for j in range(sequence_range):
+                if i+j > last_element:
+                    bead_subseq.append(bead_sequence[(last_element+j)])
+                else:
+                    bead_subseq.append(bead_sequence[(i+j)])
+                    
+            while too_close:
+                # loop works like this:
+                #    0. generates trial position
+                #    1. generates a list of beads in neighbouring cell for this trial position
+                #    2. checks the distance between neighours and trial_position
+                #    3. too close is defaultly assumed and maintained until end of loop
 
+                not_valid = True
+                while not_valid:
+                    trial_pos = new_position(current_pos, bond, 1, self.cellside*self.cellnums, phi, theta) # new posn
+                    not_valid = self.index(self.which_cell(trial_pos)).forbidden
+                    
+                previous = current_pos
+                current_pos = trial_pos
+                
+                bead_type = bead_subseq[0]
+
+                neighbours = self.check_surroundings(current_pos)
+                issues = 0
+                index_c = self.which_cell(current_pos)
+                
+                # neighbor checking takes place here.
+                for j in neighbours:            
+                    index_n = self.which_cell(j[-1])
+                    
+                    # deals with instances of periodicity, no different from the code above.
+                    # to obtain the constant, calculate the maximum norm of two adjacent cell indices
+                    if self.cellnums-1 in np.abs(index_c - index_n):
+                        period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                        real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                    else:
+                        real_j = j[-1]                                            
+
+                    distance = round(np.linalg.norm(current_pos - real_j), 5)
+                    sigma = mini*self.interactions.return_sigma(bead_type, j[2])
+                    if distance < sigma:                        
+                        issues += 1
+                        break
+                    
+                # monte carlo check
+                if meanfield == True:
+                    random_num = np.random.uniform(0,1)
+                    avg_density = sum([self.index(index_c).densities[self.interactions.typekeys[i]-1] for i in bead_subseq])/len(bead_subseq)
+                    if random_num > avg_density:
+                        issues+=1
+
+                if density_mc == True:
+                    random_num = np.random.uniform(0,1)
+                    box_density = self.num_beads/self.boxsize**3
+                    cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
+                    
+                if issues > 0:      
+                    too_close = True
+                    current_pos = previous
+                else:
+                    too_close = False
+
+                # This has to be here: the failure condition is False when generation_count = 0
+                generation_count += 1
+
+                # FAILURE CONDITIONS -------------------------------------------------------------
+                if generation_count % walk_failures == 0:
+                    if termination == "retract":
+                        # pick a number of beads that will be deleted
+
+                        self.retractions += 1
+                        # adjust walk positions
+                        
+                        if i == 1:
+                            # conditions for when the random walk returns to the initial bead
+                            # here, retraction is not possible: two cases must be considered
+                            # 1. CASE 1: Walk is standalone.
+                            #            Here, the walk should be cancelled and resumed elsewhere.
+                            #            One way to do this is via recursion.
+                            # 2. CASE 2: Walk is part of a graft.
+                            #            In this situation a new position must be found for the graft, but constrained to 
+                            #            the region in which the grafting target is found.
+
+
+                            # REDO RANDOM WALK ----------------------------------------------------------------------------
+                            print("Graft has returned to initial bead. Finding a new starting position.")                                                           
+                            # employ the same mechanism as in randomwalk to find a suitable position.
+                            
+
+                            i = 0 # reset index to 0, NOT 1.
+                            self.num_beads -= 1
+                            self.num_walk_beads -= 1 # the individual count beads that make up a walk
+
+                            # delete the initially placed bead
+                            progress = self.walk_data(ID)
+                            bad_bead = progress[-1]
+                            current_cell = self.which_cell(bad_bead[-1])
+                            self.index(current_cell).beads.remove(bad_bead)                        
+
+                            # this is to ensure that the graft bead is not truly stuck
+                            retraction_count += 1
+                            if retraction_count > retraction_limit:
+                                print("----------------------------------------------------------")
+                                print("Graft bead placed in highly unfavourable area.")
+                                print("Deleting previous random walk. This walk should be re-run.")
+                                print("----------------------------------------------------------")
+                                self.delete_walk(self.num_walks)                                
+                                self.dead_walks +=1
+                                return 0
+
+
+                            too_close = True
+                            generation_count = 0
+                            position = self.walk_data(starting_bead[0])[starting_bead[1]][-1]                            
+                            
+                            while too_close:
+                                trial = new_position(position, starting_distance, 1, self.cellside*self.cellnums, phi, theta)
+
+                                previous = position
+                                current_pos = trial
+
+                                neighbours = self.check_surroundings(current_pos)
+                                issues = 0
+                                index_c = self.which_cell(current_pos)
+                                # neighbor checking takes place here.
+                                for j in neighbours:            
+                                    index_n = self.which_cell(j[-1])
+
+                                    # deals with instances of periodicity, no different from the code above.
+                                    # to obtain the constant, calculate the maximum norm of two adjacent cell indices
+                                    if self.cellnums-1 in np.abs(index_c - index_n):
+                                        period = np.array([i if abs(i) == (self.cellnums-1) else 0 for i in (index_n - index_c)])
+                                        real_j = -period*(self.cellnums/(self.cellnums - 1))*self.cellside + j[-1]
+                                    else:
+                                        real_j = j[-1]                                            
+
+                                    distance = round(np.linalg.norm(current_pos - real_j), 5)
+                                    check = mini*self.interactions.return_sigma(bead_sequence[0], j[2])
+                                    if distance < check:                        
+                                        issues += 1
+                                        break
+
+                                # monte carlo check
+                                if meanfield == True:
+                                    random_num = np.random.uniform(0,1)
+                                    density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
+                                    if random_num > density:
+                                        issues+=1
+
+                                if issues > 0:      
+                                    too_close = True
+                                    current_pos = previous
+                                    generation_count+=1
+
+                                    if generation_count % initial_failures == 0:
+                                        if soften == True:
+                                            mini = srate*mini
+                                            if suppress == False:
+                                                print(f"Failure tolerance reached when grafting at {self.num_beads}.")
+                                                print(f"Softening minimum requirement. Current minima: {mini}")
+
+                                        else:
+                                            print("Position for graft bead not found. Consider reattempting with a sparser box.")
+                                            print("Graft unsuccessful.")
+                                            raise Exception("Program terminated.")            
+                                else:
+                                    too_close = False     
+                                
+                        else:
+                            
+                            deletion = random.randint(1, int(0.5*i))
+                            initial = i
+
+                            for bead in range(deletion):
+                                progress = self.walk_data(ID)
+                                bad_bead = progress[-1]
+                                current_cell = self.which_cell(bad_bead[-1])
+
+                                self.index(current_cell).beads.remove(bad_bead)                        
+
+                                new_progress = self.walk_data(ID)          
+                                current_pos = new_progress[-1][-1]
+                                current_cell = self.which_cell(current_pos)
+
+                                i -= 1
+                                self.num_beads -= 1
+                                self.num_walk_beads -= 1
+
+                            print(f"Retracting at bead {initial} of random walk {ID}. Current bead: {i}")
+
+                            if danger_mode == True:
+                                termination = 'soften'
+                                mini = 1.12234
+                                danger_mode = False
+
+                    elif termination == "soften":
+                        if suppress == False:
+                            print(f"Failure tolerance reached on graft walk {self.num_beads}. Softening minimum requirement. Current minima: {mini}")
+                            mini = srate*mini
+
+                            if mini < danger:
+                                danger_mode = True
+                                termination = 'retract'
+
+                    else:                        
+                        print("Warning for Random Walk ID: " + str(ID))
+                        print("The system has now generated %d unsuccessful positions for this walk." % (generation_count))
+                        print("It's very likely that the random walk has either become trapped or")
+                        print("that the lattice has become too dense to generate a valid position.")
+                        print("It is highly recommended to restart the program with:")
+                        print("a) a fewer number of atoms,")
+                        print("b) a larger amount of lattice space,")
+                        print("c) a smaller step distance.")
+                        raise Exception("Program terminated.")
+                        
+                # -----------------------------------------------------------------------------------
+
+
+            mini = 1.12234
+            current_pos = trial_pos
+            current_cell = self.which_cell(current_pos)
+
+            # 0: random walk this belongs to
+            # 1: number of the bead (on the random walk)
+            # 2: bead type
+            # 3: bead mass
+            # 4: bond type (number)
+            # 5: number of beads within structure
+            # 6: grafting
+            # -1: current position
+
+            # Note 6: grafting. if -1, no graft. Otherwise? graft is present.
+            #         When there IS a graft, 6 is replaced with the global number of the first grafted
+            #         bead.
+            # Note -1: the last index of the bead data, used as convention throughout the program.
+
+            bead_data = [ID,
+                         i,
+                         bead_sequence[(i % len(bead_sequence))],
+                         bond_type,
+                         self.num_beads,
+                         current_pos]
+
+            self.num_walk_beads += 1
+            self.num_beads += 1
+            self.index(current_cell).beads.append(bead_data)
+
+            i+=1
+
+        self.num_walks += 1
+        self.num_bonds += numbeads - 1
+        self.random_walked = True
+
+        self.walkinfo[ID] = self.num_walk_beads        
+        self.graft_ids.append(ID)
+        
         gbead_0 = [self.num_walks, 0]
         self.graft_coords.append([starting_bead, gbead_0])
         self.num_grafts += 1
-        self.num_bonds += 1
-            
 
+        # add that one extra bond
+        self.num_bonds += 1    
+
+        return 1    
 
     def unbonded_crosslinks(self, bead_type, crosslinks, Kval, cutoff, energy, sigma, allowed=None,bdist=None, prob=1.0, style='fene', allowed_failures = 50, ibonds=2, jbonds=1):
         """ 
@@ -1316,10 +1825,18 @@ ed.
     # The functions in this section do not introduce any new functionality into the system. Rather,
     # they use existing functionality to perform more complex tasks.
 
-    def uniform_chain(self, size, rw_kval, rw_cutoff, rw_epsilon, rw_sigma, bead_sequence, termination="retract",
-                      meanfield=False):
+    def uniform_chain(self, size,
+                      rw_kval, rw_cutoff, rw_epsilon, rw_sigma,
+                      bead_sequence, mini=1.12234,
+                      termination="soften", srate=0.99, suppress="False", danger=0.6,
+                      initial_failures=10000, walk_failures=10000,
+                      sequence_range = 1,
+                      retraction_limit = 10,
+                      meanfield=False, soften=True,):
         # pick the index of a random bead in walk
-        index = random.randrange(size)
+
+        index = random.randrange(sequence_range,size-sequence_range)
+            
 
         # generate the full list, and then split it apart at index i
         full_list = [bead_sequence[i%len(bead_sequence)] for i in range(size)]
@@ -1334,7 +1851,14 @@ ed.
                         rw_sigma,
                         list2,
                         termination=termination,
-                        meanfield=meanfield)
+                        meanfield=meanfield,
+                        soften=True,
+                        srate=srate,
+                        sequence_range = sequence_range,
+                        initial_failures=initial_failures,
+                        danger = danger,
+                        walk_failures=walk_failures,
+                        suppress=suppress)
 
         # reverse the first list, then GRAFT it onto the first bead of the last generated chain
         starting_bead = [self.num_walks, 0]
@@ -1345,7 +1869,16 @@ ed.
                          rw_epsilon,
                          rw_sigma,
                          list1[::-1],
-                         meanfield=meanfield)
+                         meanfield=meanfield,
+                         termination=termination,
+                         soften=True, 
+                         srate=srate,
+                         initial_failures=initial_failures,
+                         retraction_limit = retraction_limit,
+                         danger = danger,
+                         sequence_range = sequence_range,
+                         walk_failures=walk_failures,
+                         suppress=suppress)
 
     
 
@@ -1367,6 +1900,38 @@ ed.
             return all_data
         else:
             return [i for i in all_data if (i[0] == which_ID)]
+    
+    def delete_walk(self, walk_id):
+        """
+        Deletes the walk with the given ID.
+        Limitations: should only be used when the walk_id is that of the latest generated walk.
+                     This can be fixed by modifying every bead in the box, but this might be fiddly.
+        """
+        
+        dead_walk = self.walk_data(walk_id)
+        num_dead = len(dead_walk) # this is the number of beads that have to be deleted
+
+        for i in range(num_dead):
+            self.num_beads -= 1
+            self.num_walk_beads -= 1 # the individual count beads that make up a walk
+
+            # same method used for retraction
+            progress = self.walk_data(walk_id)
+            bad_bead = progress[-1]
+            current_cell = self.which_cell(bad_bead[-1])
+            self.index(current_cell).beads.remove(bad_bead)
+        
+        self.num_walks -= 1
+        self.num_bonds -= num_dead - 1
+
+        if walk_id in self.graft_ids:
+            delbond = [[walk_id-1, 0], [walk_id, 0]]
+            self.graft_coords.remove(delbond)
+            self.graft_ids.remove(walk_id)
+            self.num_bonds -= 1
+
+        del self.walkinfo[walk_id]
+        
 
     def crosslink_data(self, which_ID = None):
         all_data = []

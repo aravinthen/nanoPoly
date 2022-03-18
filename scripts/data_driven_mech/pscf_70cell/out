@@ -1,0 +1,91 @@
+ format  1  0
+
+MONOMERS            
+N_monomer                               
+                   2
+kuhn                                    
+    1.0000000000E+00    1.0000000000E+00
+
+CHAINS              
+N_chain                                 
+                   1
+N_block                                 
+                   2
+block_monomer       
+                   1                   2
+block_length        
+    2.5000000000E-01    7.5000000000E-01
+
+COMPOSITION         
+ensemble                                
+                   0
+phi_chain                               
+    1.0000000000E+00
+
+INTERACTION         
+interaction_type                        
+               'chi'
+chi                                     
+    2.5000000000E+01
+
+UNIT_CELL           
+dim                                     
+                   3
+crystal_system                          
+             'cubic'
+N_cell_param                            
+                   1
+cell_param                              
+    2.0567574587E+00
+
+DISCRETIZATION      
+ngrid                                   
+                  70                  70                  70
+chain_step                              
+    1.0000000000E-02
+
+BASIS               
+group_name                              
+          'I m -3 m'
+
+ITERATE             
+input_filename                          
+     'test.omega.in'
+output_prefix                           
+                  ''
+max_itr                                 
+                 100
+error_max                               
+    1.0000000000E-05
+domain                                  
+                   T
+itr_algo                                
+                'NR'
+N_cut                                   
+                  95
+
+FINISH              
+
+THERMO              
+f_Helmholtz                             
+    3.1565338553E+00
+f_homo                                  
+    3.6875000000E+00
+pressure                                
+    3.3126873268E+00
+mu_chain                                
+    6.4692211820E+00
+stress                                  
+   -1.6369445191E-08
+
+STATISTICS          
+N_star                                  
+                4218
+final_error                             
+    2.1880493176E-06
+iterations                              
+                  33
+basis_time                              
+    4.1220163000E+01
+scf_time                                
+    8.1609119100E+02

@@ -10,11 +10,11 @@ CHAINS
 N_chain                                 
                    1
 N_block                                 
-                   2
+                   3
 block_monomer       
-                   1                   2
+                   1                   2                   1
 block_length        
-    4.0000000000E-01    6.0000000000E-01
+    1.0000000000E-01    8.0000000000E-01    1.0000000000E-01
 
 COMPOSITION         
 ensemble                                
@@ -26,7 +26,7 @@ INTERACTION
 interaction_type                        
                'chi'
 chi                                     
-    3.0000000000E+01
+    6.0000000000E+01
 
 UNIT_CELL           
 dim                                     
@@ -36,11 +36,11 @@ crystal_system
 N_cell_param                            
                    1
 cell_param                              
-    2.6797298084E+00
+    1.4220091663E+00
 
 DISCRETIZATION      
 ngrid                                   
-                  15                  15                  15
+                  35                  35                  35
 chain_step                              
     1.0000000000E-02
 
@@ -54,38 +54,38 @@ input_filename
 output_prefix                           
                   ''
 max_itr                                 
-                 100
+                 400
 error_max                               
-    1.0000000000E-08
+    1.0000000000E-05
 domain                                  
                    T
 itr_algo                                
                 'NR'
 N_cut                                   
-                  60
+                  95
 
 FINISH              
 
 THERMO              
 f_Helmholtz                             
-    3.9602807921E+00
+    7.4971820665E+00
 f_homo                                  
-    6.2000000000E+00
+    8.6000000000E+00
 pressure                                
-    3.0788281069E+00
+    5.6422626988E+00
 mu_chain                                
-    7.0391088990E+00
+    1.3139444765E+01
 stress                                  
-    8.9099377912E-05
+    7.6365336027E-09
 
 STATISTICS          
 N_star                                  
-                  60
+                 570
 final_error                             
-    8.9099377912E-03
+    5.7718499577E-06
 iterations                              
-                 101
+                  27
 basis_time                              
-    6.3561500000E-01
+    5.1638110000E+00
 scf_time                                
-    4.7083968000E+01
+    1.3474302500E+02

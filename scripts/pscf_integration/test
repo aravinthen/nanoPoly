@@ -10,11 +10,11 @@ CHAINS
 N_chain                                                                
         1                                                   
 N_block                                                                
-        2                                                      
+        3                                                      
 block_monomer                                                          
-                      1              2                                                
+                      1              2              1                                                
 block_length                                                           
-                      4.000000E-01              6.000000E-01                                                 
+                      1.000000E-01              8.000000E-01              1.000000E-01                                                 
                                                      
 COMPOSITION                                                            
 ensemble                                                               
@@ -27,7 +27,7 @@ INTERACTION
 interaction_type                                                       
           'chi'                                                        
 chi                                                                    
-        3.000000E+01                                                          
+        6.000000E+01                                                          
                                                                        
                                                      
 UNIT_CELL                                                              
@@ -42,7 +42,7 @@ cell_param
                                                                        
 DISCRETIZATION                                                         
 ngrid                                                                  
-             15             15             15     
+             35             35             35     
 chain_step                                                             
         1.000000E-02                                                   
                                                                        
@@ -74,9 +74,9 @@ input_filename
 output_prefix                                                          
           ''                                                           
 max_itr                                                                
-            100                                                  
+            400                                                  
 error_max                                                              
-            1.000000E-08                                                
+            1.000000E-05                                                
 domain                                                                 
               T                                                        
 itr_algo                                                               

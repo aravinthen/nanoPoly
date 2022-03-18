@@ -30,12 +30,12 @@ class MDSim:
         self.dumping = 0 # used to turn on dumping
         self.global_dump = 0 # used to move dump files into a folder
         self.data_production = 0
+        self.deform_count = 0 # used to generate multiple deformation_files
 
         self.pending_mods = []
 
         self.set_settings = False
 
-        # variable below is set True when the types dictionary has been ennumerated.
 
     def global_bead_num(self, bead):
         """
@@ -225,7 +225,7 @@ velocity        all create {float(temp)} {seed} \n")
             f.write(f"\
 fix             1 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
 fix             2 all langevin {float(temp)} {float(final_temp)} {damp} {seed}\n\
-")
+a")
 
             f.write(f"\
 thermo_style    custom {data_string} \n\
@@ -463,7 +463,8 @@ Bonds                                                                           
                  filename=None,
                  nlist=[10,1000],
                  nskin=1.0,
-                 dielectric=False):
+                 dielectric=False,
+                 prebuilt=None):
         """ 
         NOTE: This comes SECOND in the simulation order of precedence!
               Will flag an error if sim_structure hasn't run first.
@@ -474,8 +475,12 @@ Bonds                                                                           
                     dielectric: whether the material is dielectric or not.
                                 WARNING! needs a bit of confirmation.
         """
-        if self.polylattice.structure_ready == False:
+        if self.polylattice.structure_ready == False and prebuilt==None:
             raise EnvironmentError("You must create a structure file before settings can be defined.")
+            
+        if prebuilt!=None:
+            self.data_file = prebuilt
+            self.polylattice.structure_ready = True
         
         def dictionary_shuffle(my_dict, key_of_list):
             """
@@ -765,7 +770,7 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
             f.close()
 
-    def deform(self, steps, timestep, strain, temp, final_temp=None, damp=None, datafile=True, output_steps=100, dump=0, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), seed=random.randrange(0,99999), description = None):
+    def deform(self, steps, timestep, deformation, temp, final_temp=None, damp=None, datafile=True, remap=True, output_steps=100, dump=0, reset=True, data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',), seed=random.randrange(0,99999), description = None):
         """
         Carries out the deformation of the box. 
         Note: strain MUST be a six-dimensional list/vector.
@@ -801,12 +806,48 @@ run             0            \n\
             f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
 ")
+            
+
+
+        # add any missing elements to the deformation data
+
+        true_data = [i for i in deformation]
+        dimension = []
+
+        for d in deformation:
+            dimension.append(d[0])        
+
+        print(dimension)
+
+        dims = ['x', 'y', 'z']
+        for d in dims:
+            if d not in dimension:
+                true_data.append([d, 'volume'])
+
+        print(true_data)
+                
+        defdata = {}
+        for i in true_data:
+            defdata[i[0]] = i[1]
+
+        deformation_string = ""
+        for i in dims:
+            deformation_string += f"{i} "
+            
+            if defdata[i] == 'volume':
+                deformation_string += f"volume "
+            else:
+                deformation_string += f"final 0 {defdata[i]} "
+
+        deformation_string += "units box "
+        if remap == True:
+            deformation_string += "remap x"
 
         f.write(f"\
 velocity        all create {float(temp)} 1231 \n\
 fix             1 all langevin {float(temp)} {float(final_temp)} {damp} {seed} \n\
 fix             2 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
-fix		3 all deform 1 x trate {strain[0]} y trate {strain[1]} z trate {strain[2]} units box remap x \n\
+fix		3 all deform 1 {deformation_string} \n\
 ")
         if datafile==True:
             self.data_production = 1
@@ -817,8 +858,9 @@ variable        var_{i} equal \"{i}\"              \n\
 ")
             file_string = "\"${var_"+ "}\t${var_".join(data) + "}\""
 
+            file_name = self.file_name+ "-" +str(self.deform_count) 
             f.write(f"\
-fix             datafile all print {output_steps} {file_string} file {self.file_name}.deform.data title {title} screen no \n\
+            fix             datafile all print {output_steps} {file_string} file {file_name}.deform.data title {title} screen no \n\
 ")
             
         f.write(f"\
@@ -844,6 +886,8 @@ undump 1        \n\
             f.write(f"\
 unfix datafile \n\
 ")
+        # increment deformation count
+        self.deform_count += 1
             
     def run(self, folder=None, lammps_path= None, mpi=0):
         """
@@ -853,7 +897,6 @@ unfix datafile \n\
         if self.global_dump == 1 or self.data_production == 1:
             if folder==None:
                 print("No directory for dumping: files will be dumped in working directory.")
-                print("Note that this is usually considered a bad move.")
             else:
                 if not path.exists(f"{folder}"):
                     os.system(f"mkdir {folder}")
@@ -874,9 +917,9 @@ unfix datafile \n\
             print(f"Number of cores: {mpi}.")
 
             if lammps_path==None:
-                os.system(f"mpirun -np {mpi} lmp -in {self.file_name}")
+                os.system(f"mpiexec -np {mpi} lmp -in {self.file_name}")
             else:
-                os.system(f"mpirun -np {mpi} {lammps_path} -in {self.file_name}")
+                os.system(f"mpiexec -np {mpi} {lammps_path} -in {self.file_name}")
 
         if correct_dumping == 1:
             if self.data_production == 1:

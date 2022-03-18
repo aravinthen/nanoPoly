@@ -106,7 +106,6 @@ timestep = 1e-3
 dmp = 100
 # -------------------------------------------------------------------------------------
 
-view_path = "~/ovito-basic-3.5.4-x86_64/bin/ovito"
-box.mdsim.view(view_path, "test_structure2.in")
+
 
 # box.mdsim.run(folder="frozen_velocities", lammps_path="~/Research/lammps/src/lmp_mpi", mpi=18)

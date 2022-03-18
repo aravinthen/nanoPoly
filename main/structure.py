@@ -7,8 +7,6 @@ import time
 import random
 import math as m
 from functools import reduce
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 def factors(n):    
     return set(reduce(list.__add__, 
@@ -84,7 +82,7 @@ class Structure:
                 types_list = [i for i in self.types]
                 # type connections are built in                
                 for i in range(self.num_types):
-                    for j in range(self.num_types):
+                    for j in range(self.num_types):                        
                         type_matrix[i,j] = f'{types_list[i]},{types_list[j]}'
 
                 self.type_matrix = type_matrix
