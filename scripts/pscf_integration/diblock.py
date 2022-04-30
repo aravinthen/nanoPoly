@@ -16,7 +16,7 @@ from meanfield import MeanField
 print("NANOPOLY SIMULATION")
 box_size = 90.0
 t0 = time.time()    
-box = PolyLattice(box_size, cellnums=30)
+box = PolyLattice(box_size, cellnums=10)
 dmp = 100
 scft_calc = True
 
@@ -33,20 +33,20 @@ box.interactions.newType("b", 0.55,
 
 if scft_calc == True:
     box.meanfield.parameters("test",
-                             [30,30,30],
+                             [10,10,10],
                              25.0,
                              'cubic',
                              1.0e-2,
                              'I m -3 m',
                              [
-                             [("a", 1.0, 0.25), ("b", 1.0, 0.75)]
+                                 [("a", 1.0, 0.8), ("b", 1.0, 0.2)]
                              ],
                              cell_param=1.923202,
                              error_max=1e-5,
-                             max_itr=100,
+                             max_itr=400,
                              ncut=95,)
 
-    box.meanfield.model_field("test_model", 0, [[0.0, 0.0, 0.0], 
+    box.meanfield.model_field("test_model", 1, [[0.0, 0.0, 0.0], 
                                             [0.5, 0.5, 0.5]])
 
     path_pscf = "/home/wmg/phrmzc/Research/research-code/pscf/bin"

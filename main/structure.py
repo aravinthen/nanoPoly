@@ -214,31 +214,51 @@ class Structure:
         def return_sigma(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
+            
+            if np.shape(self.type_matrix)[0] == 1:
+                return self.sigma_matrix[0]
+                
             ni, nj = np.where(self.type_matrix == namestring)
             return self.sigma_matrix[ni,nj][0]
 
         def return_energy(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
+
+            if np.shape(self.type_matrix)[0] == 1:
+                return self.energy_matrix[0]
+
             ni, nj = np.where(self.type_matrix == namestring)
             return self.energy_matrix[ni,nj][0]
         
         def return_cutoff(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
+            
+            if np.shape(self.type_matrix)[0] == 1:
+                return self.cutoff_matrix[0]
+
             ni, nj = np.where(self.type_matrix == namestring)
             return self.cutoff_matrix[ni,nj][0]
         
         def return_n(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
+            
+            if np.shape(self.type_matrix)[0] == 1:
+                return self.n_matrix[0]
+
             ni, nj = np.where(self.type_matrix == namestring)
             return self.n_matrix[ni,nj][0]
         
         def return_alpha(self, type1, type2):
             # returns the interaction between two beads
             namestring = f"{type1},{type2}"
-            ni, nj = np.where(self.type_matrix == namestring)
+
+            if np.shape(self.type_matrix)[0] == 1:
+                return self.alpha_matrix[0]
+
+            ni, nj = np.where(self.type_matrix == namestring)            
             return self.alpha_matrix[ni,nj][0]
         
         def return_lambda(self, type1, type2):

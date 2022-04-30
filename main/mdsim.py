@@ -561,14 +561,24 @@ neigh_modify  every {nlist[0]} one {nlist[1]}                                   
         # add pair interactions of different beads
         for i in range(np.shape(self.polylattice.interactions.type_matrix)[0]):
             for j in range(i, np.shape(self.polylattice.interactions.type_matrix)[0]):
-                typestring = self.polylattice.interactions.type_matrix[i,j]
-                type1, type2 = typestring.split(",")
-                num1 = self.polylattice.interactions.typekeys[type1]
-                num2 = self.polylattice.interactions.typekeys[type2]
                 
-                energy = self.polylattice.interactions.return_energy(type1, type2)
-                sigma = self.polylattice.interactions.return_sigma(type1, type2)
-                cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
+                if np.shape(self.polylattice.interactions.type_matrix)[0] == 1:
+                    typestring = self.polylattice.interactions.type_matrix[0]
+                    type1, type2 = typestring.split(",")
+                    num1 = self.polylattice.interactions.typekeys[type1]
+
+                    num2 = num1
+                    energy = self.polylattice.interactions.return_energy(type1, type2)
+                    sigma = self.polylattice.interactions.return_sigma(type1, type2)
+                    cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
+                else:
+                    typestring = self.polylattice.interactions.type_matrix[i,j]
+                    type1, type2 = typestring.split(",")
+                    num1 = self.polylattice.interactions.typekeys[type1]
+                    num2 = self.polylattice.interactions.typekeys[type2]                    
+                    energy = self.polylattice.interactions.return_energy(type1, type2)
+                    sigma = self.polylattice.interactions.return_sigma(type1, type2)
+                    cutoff = self.polylattice.interactions.return_cutoff(type1, type2)
                 
                 f.write(f"\
 pair_style    lj/cut {cutoff}                                                         \n\
@@ -627,7 +637,7 @@ minimize     {etol} {ftol} {mit} {meval}    \n\
     def equilibrate(self, steps, timestep, temp, dynamics,
                     bonding=False, final_temp=None,
                     damp=10.0, tdamp=None, pdamp=None, drag=2.0, scale=False,
-                    output_steps=100, dump=0, data=('step','temp','press', 'pe', 'ke'),
+                    output_steps=100, dump=0, data=('step','temp','lx', 'ly', 'lz', 'pxx', 'pyy', 'pzz', 'pe', 'ke'),
                     seed=random.randrange(0,99999),
                     rcf=False,
                     reset=False, description=None):
@@ -738,7 +748,7 @@ unfix {i+2} \n\
             f.write(f"\
 write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
 ")
-        if dynamics=='nose-hoover':
+        if dynamics=='npt':
             if dump>0:
                 self.global_dump = 1
                 self.dumping = 1
@@ -806,8 +816,6 @@ run             0            \n\
             f.write(f"\
 dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
 ")
-            
-
 
         # add any missing elements to the deformation data
 
@@ -817,14 +825,10 @@ dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs 
         for d in deformation:
             dimension.append(d[0])        
 
-        print(dimension)
-
         dims = ['x', 'y', 'z']
         for d in dims:
             if d not in dimension:
                 true_data.append([d, 'volume'])
-
-        print(true_data)
                 
         defdata = {}
         for i in true_data:

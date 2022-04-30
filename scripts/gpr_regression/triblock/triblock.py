@@ -12,8 +12,8 @@ from analysis import Check
 from meanfield import MeanField
 
 print("NANOPOLY SIMULATION")
-box_size = 85.0
-cellnums = 70
+box_size = 90.0
+cellnums = 80
 t0 = time.time()    
 box = PolyLattice(box_size, cellnums)
 
@@ -40,8 +40,8 @@ if os.path.exists(dir):
 os.makedirs(dir)
 
 # walk details
-num_walks = 62 # 100 # number of walks in a box
-size = 3000 # size of the chain
+num_walks = 50 # 100 # number of walks in a box
+size = 2500 # size of the chain
 rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
@@ -60,8 +60,8 @@ iterations = 10
 relaxation = 2500
 num_relax = 4
 shrink_steps = 100000
-equib = 100000
-deform_steps = 100000
+equib = 50000
+deform_steps = 150000
 
 for it in range(iterations):
     bsize = np.round(0.8+it*0.02, 5)
@@ -124,13 +124,14 @@ for it in range(iterations):
                           rw_sigma,
                           bead_sequence = copolymer,
                           meanfield = True,
-                          srate = 0.99, 
+                          termination='soften',
+                          srate = 0.98, 
                           suppress= False,
-                          danger = 1.03,
+                          danger = 1.08,
                           initial_failures=15000,
                           walk_failures=15000,
-                          retraction_limit = 5,
-                          sequence_range=int(0.125*size))
+                          retraction_limit = 10,
+                          sequence_range=int(0.9*asize*size))
         t1 = time.time()
         print(f"Walk {i} complete. Time taken: {t1-t0} seconds.")
         total_time+= t1-t0
@@ -147,13 +148,17 @@ for it in range(iterations):
                               rw_cutoff,
                               rw_epsilon,
                               rw_sigma,
+                              bead_sequence = copolymer,
+                              meanfield = True,
                               termination='soften',
-                              bead_sequence=copolymer,
-                              srate=0.99,
-                              suppress=False,
-                              sequence_range = 5,
-                              retraction_limit = 0,
-                              danger=1.12)
+                              srate = 0.98, 
+                              suppress= False,
+                              danger = 1.08,
+                              initial_failures=15000,
+                              walk_failures=15000,
+                              retraction_limit = 5,
+                              sequence_range=int(0.9*asize*size))
+
 
 
     print(f"Walks complete. Total time: {total_time} seconds")
@@ -165,13 +170,12 @@ for it in range(iterations):
     # # minimise to iron out issues
     box.mdsim.minimize(1e-10, 1e-10, 100000, 1000000)
 
-    squash = [-1.2e-3, -1.2e-3, -1.2e-3]
     box.mdsim.deform(shrink_steps,
                      timestep,
                      [['x', 52],
                       ['y', 52],
                       ['z', 52]],
-                     0.0,
+                     0.1,
                      reset=False,
                      dump=dmp,
                      description="deform")

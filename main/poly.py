@@ -335,6 +335,7 @@ class PolyLattice:
                    density_mc=False, meanfield=False,
                    end_pos=None,
                    soften=True, srate=0.99, suppress=False, danger = 1.0,
+                   retraction_limit = 10,
                    termination='soften', initial_failures=10000, walk_failures=10000):
         """index_c
         Produces a random walk.
@@ -686,6 +687,7 @@ class PolyLattice:
         current_pos = starting_pos
 
         danger_mode = False
+        retraction_count = 0
         while i < numbeads:            
             too_close = True # used to check if the cell is too close
             generation_count = 0 # this counts the number of random vectors generated.
@@ -827,6 +829,17 @@ class PolyLattice:
 
                             # redo random walk
                             print("Walk has retracted to first bead - restarting random walk.")
+
+                            retraction_count += 1
+                            if retraction_count > retraction_limit:
+                                print("----------------------------------------------------------")
+                                print("Walk occuring in a highly unfavourable area.")
+                                print("Terminating algorithm to avoid recursion problems.")
+                                print("The walk may be rerun using the dead_walks attribute.")
+                                print("----------------------------------------------------------")
+                                self.dead_walks +=1
+                                return 0
+
                             self.randomwalk(numbeads,
                                             Kval,
                                             cutoff,
@@ -1842,7 +1855,18 @@ ed.
         full_list = [bead_sequence[i%len(bead_sequence)] for i in range(size)]
         list1 = [full_list[i] for i in range(index)]
         list2 = [full_list[i] for i in range(index, size)]
+        
+        if sequence_range > len(list1):
+            l1seq = len(list1)
+        else:
+            l1seq = sequence_range
 
+
+        if sequence_range > len(list2):
+            l2seq = len(list2)
+        else:
+            l2seq = sequence_range
+        
         # generate the SECOND list into a random walk
         self.randomwalk(len(list2),
                         rw_kval,
@@ -1854,7 +1878,7 @@ ed.
                         meanfield=meanfield,
                         soften=True,
                         srate=srate,
-                        sequence_range = sequence_range,
+                        sequence_range = l2seq,
                         initial_failures=initial_failures,
                         danger = danger,
                         walk_failures=walk_failures,
@@ -1876,7 +1900,7 @@ ed.
                          initial_failures=initial_failures,
                          retraction_limit = retraction_limit,
                          danger = danger,
-                         sequence_range = sequence_range,
+                         sequence_range = l1seq,
                          walk_failures=walk_failures,
                          suppress=suppress)
 

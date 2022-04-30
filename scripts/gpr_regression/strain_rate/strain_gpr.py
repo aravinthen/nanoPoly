@@ -13,11 +13,11 @@ from meanfield import MeanField
 
 print("NANOPOLY SIMULATION")
 box_size = 90.0
-cellnums = 70
+cellnums = 80
 t0 = time.time()    
 box = PolyLattice(box_size, cellnums)
 
-dmp = 1000
+dmp = 10000
 
 scft_calc = False
 t1 = time.time()
@@ -30,16 +30,19 @@ box.interactions.newType("b", 0.51,
                          (1.0, 0.5, 1.5),
                          ('a,b', (1.0, 0.2, 1.5)))
 
+bsize = 0.8
+asize = (1-bsize)/2
+
 t0 = time.time()
 if scft_calc == True:
     box.meanfield.parameters("test",
                              [int(0.5*cellnums), int(0.5*cellnums), int(0.5*cellnums)],
-                             25.0,
+                             60.0,
                              'cubic',
                              1.0e-2,
                              'I m -3 m',
                              [
-                             [("a", 1.0, 0.25), ("b", 1.0, 0.75)]
+                                 [("a", 1.0, asize), ("b", 1.0, bsize), ("a", 1.0, asize)]
                              ],
                              cell_param=1.923202,
                              error_max=1e-5,
@@ -65,14 +68,13 @@ if os.path.exists(dir):
 os.makedirs(dir)
 
 # walk details
-num_walks = 125 # 100 # number of walks in a box
-size = 1000 # size of the chain
+num_walks = 50 # 50 # # number of walks in a box
+size = 2500 # size of the chain
 rw_kval = 30
 rw_cutoff = 1.5
 rw_epsilon = 1.0
 rw_sigma = 1.0
 timestep = 0.005
-copolymer = []
 
 # 48.33904695510864 seconds
 
@@ -81,21 +83,28 @@ copolymer = []
 # num_relax = 5
 # deform_steps = 10000
 
-iterations = 10
+
+start = 4
+iterations = 3
 relaxation = 2500
 num_relax = 4
 shrink_steps = 100000
-equib = 150000
+equib = 50000
 
+
+copolymer = []
 # copolymer specification
-for i in range(int(size*0.25)):
+for i in range(int(asize*size)):
     copolymer.append('a')
-for i in range(int(size*0.75)):
+for i in range(int(bsize*size)):
     copolymer.append('b')
+for i in range(int(asize*size)):
+    copolymer.append('a')
 
-for it in range(1, iterations+1):
-    deform_steps = 100000*it
-    strain = np.round(250/deform_steps, 4)
+
+for it in range(start, start+iterations+1):
+    deform_steps = 25000*it
+    strain = np.round((300-52)/deform_steps, 5)
     #----------------------------------------------------------------------------------------
     # DENSITY ASSIGNMENT
     #----------------------------------------------------------------------------------------
@@ -116,12 +125,14 @@ for it in range(1, iterations+1):
                           rw_sigma,
                           bead_sequence = copolymer,
                           meanfield = True,
-                          srate = 0.99, 
+                          termination='soften',
+                          srate = 0.98, 
                           suppress= False,
                           danger = 1.03,
                           initial_failures=15000,
                           walk_failures=15000,
-                          sequence_range=int(0.125*size))
+                          retraction_limit = 10,
+                          sequence_range=int(0.9*asize*size))
         t1 = time.time()
         print(f"Walk {i} complete. Time taken: {t1-t0} seconds.")
         total_time+= t1-t0
@@ -137,10 +148,10 @@ for it in range(1, iterations+1):
 
     box.mdsim.deform(shrink_steps, 
                      timestep,
-                     [['x', 50],
-                      ['y', 50],
-                      ['z', 50]],
-                     0.0,
+                     [['x', 52],
+                      ['y', 52],
+                      ['z', 52]],
+                     0.15,
                      reset=False,
                      dump=dmp,
                      description="deform")
