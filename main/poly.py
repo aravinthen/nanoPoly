@@ -68,6 +68,8 @@ class PolyLattice:
             # multiple beads allowed in a cell.
             self.beads = []
 
+            self.energy = 0.0 # used to populate cell
+
             
     def __init__(self, boxsize, cellnums=1.0):
         """        
@@ -142,7 +144,7 @@ class PolyLattice:
         # global counts
         self.num_bonds = 0        
         self.num_beads = 0
-    
+
         # this bit of code builds the cells within the lattice.
         self.Cells = []
 
@@ -329,12 +331,13 @@ class PolyLattice:
     # # # # # # # # # # # # # # # # # # # # # KEY ALGORITHM # # # # # # # # # # # # # # # # # # # # 
     #-----------------------------------------------------------------------------------------------
     def randomwalk(self, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234,        
-                   style='fene', phi=None, theta=None, cell_num=None, 
+                   style='fene', phi=None, theta=None, 
+                   cell_num=None, cell_list=None, 
                    starting_pos=None,
-                   sequence_range = 150,
-                   density_mc=False, meanfield=False,
+                   meanfield=False,
                    end_pos=None,
                    soften=True, srate=0.99, suppress=False, danger = 1.0,
+                   width=[0.4,0.6], depth=0.0,
                    retraction_limit = 10,
                    termination='soften', initial_failures=10000, walk_failures=10000):
         """index_c
@@ -342,18 +345,20 @@ class PolyLattice:
         If cell_num argument is left as None, walk sprouts from a random cell.
         Otherwise, walk begins at specified cell.
         PARAMETER - beads: number of beads 
-        PARAMETER -controls the controls the  Kval: repulsion constant
+        PARAMETER - Kval: FENE potential parameter
         PARAMETER - cutoff: the extension limiter for the chain
         PARAMETER - sigma:  The distance value of the LJ potential.
                             This is *not* the distance between the atoms.
         PARAMETER - energy: the energy of the bond in LJ units.
         PARAMETER - phi: the torsion angle of the system.
         PARAMETER - theta: the bond angle of the system.
-        PARAMETER - ID: identifies the walk.
-        PARAMETER - cell_num: defaulted as None, but this can be set to an index.        
-                    MUST be a list.
+        PARAMETER - cell_num: The number of the cell that the random walk begins in.
+                              Defaulted as None, but this can be set to an index.        
+                              MUST be a list.
+        PARAMETER - cell_list: a list of good positions to start the random walk.
+        PARAMETER - starting_pos
         PARAMETER - bead_types: defines and identifies the beads and their types.
-                    MUST BE A DICTIONARY.
+                                MUST BE A DICTIONARY.
         OPTION -    termination: THREE OPTIONS - a) None, b) Retract and c) Break
         OPTION -    grafting: used if the generated random walk will be grafted onto something.
         OPTION -    srate: the rate at which the minimum distance requirement softens
@@ -465,8 +470,8 @@ class PolyLattice:
                 
             print(measure, mean, forcing_mag)
                 
-#            print(bead_number, forcing_mag)
-#            forcing.append(forcing_mag)
+            # print(bead_number, forcing_mag)
+            # forcing.append(forcing_mag)
 
             # print(mean, bead_number, forcing_mag[0])
 
@@ -481,8 +486,89 @@ class PolyLattice:
                     new_pos[i] = new_pos[i] - maxdis
             
             return new_pos
+            
+        #----------------------------------------------------------------------------------------------
+        def bcp_analyze(bcp):
+            # returns the full details of the block
+            # index1: the bead types.
+            # index2: the indices of the block
+
+            beadtypes = list[set(bcp)]
+
+            # stores the information about the current block of the system
+            block_indices = []
+
+            number_of_blocks = 0
+
+            # changes along the system as new blocks are found.
+            first_index = 0
+
+            initial_type = bcp[0]
+            final_type = None
+
+            for index in range(len(bcp)):
+                if bcp[index] != initial_type:
+                    new_type = bcp[index]
+                    block_desc = [(initial_type, new_type), (first_index, index-1)]
+                    block_indices.append(block_desc)
+                    initial_type = new_type
+                    first_index = index
+                    number_of_blocks +=1
+
+                if index == len(bcp)-1:
+                    block_desc = [(initial_type, initial_type), (first_index, len(bcp)-1)]
+                    block_indices.append(block_desc)
+
+                    number_of_blocks += 1
+
+            return block_indices, number_of_blocks 
+
+        def allowed_range(block, max_range, initial_range, frac=width):
+            # converts a bcp into a range of density differences.
+            # block must have the following format:
+            # a) [(type1, type2), (ind1, ind2)]
+            # 
+            # frac determines the point where the range is at the maximum. 
+            # Within frac, beads should be able to travel wherever they want.
+            # terminology: 
+            #   the push region: the chain is pushed away into a region where the bead type is 
+            #   the pull region: the chain is pulled towards the bead of the next type
+
+            range_diff = max_range - initial_range
+
+            ind1, ind2 = block[1][0], block[1][1]
+            num_beads = ind2-ind1+1 # the number of beads in the block
+
+            firstq = int(ind1+frac[0]*num_beads)
+            secondq = int(ind1+frac[1]*num_beads)
+
+            step1 = range_diff/(firstq - ind1) # the ascending step
+            step2 = range_diff/(ind2 - secondq) # the descending step
+
+            if block[0][0] == block[0][1]:
+                rise = [0.0 for i in range(0, firstq-ind1)]
+                mid = [max_range for i in range(0, secondq-firstq)]
+                fall = [-1 for i in range(0, ind2-secondq+1)]
+            else:
+                rise = [round(initial_range + i*step1, 5) for i in range(0, firstq-ind1)]
+                mid = [max_range for i in range(0, secondq-firstq)]
+                fall = [round(max_range - i*step2,5) for i in range(0, ind2-secondq+1)]
+
+            return rise+mid+fall, (firstq, secondq)
         
         #-------------------------------------------------------------------------------------------    
+
+        # copolymer information: find the ranges 
+        bcp_specs, num_blocks = bcp_analyze(bead_sequence)
+        weights = []
+        boundaries = []
+
+        for block in bcp_specs:
+            type1 = block[0][0]
+            type2 = block[0][1]
+            alrange = allowed_range(block, self.meanfield.max_dranges[(type1, type2)], depth)
+            weights += alrange[0]
+            boundaries.append(alrange[1])
 
         # bond type dictionary
         if self.bonds == None:
@@ -587,21 +673,25 @@ class PolyLattice:
             self.index(self.which_cell(starting_pos)).beads.append(bead_data)
                                 
         else:
-            if cell_num != None:
-                current_cell = np.array(cell_num)
-            else:
-                current_cell = np.array([random.randrange(0, self.cellnums),
-                                         random.randrange(0, self.cellnums),
-                                         random.randrange(0, self.cellnums)])
-                
-            cell_pos = self.index(current_cell).position
-            cell_bound = cell_pos + self.cellside
-            
             # trial for the initial position
             invalid_start = True
             total_failure = False
             failure = 0
-            while invalid_start:            
+            while invalid_start:   
+                if cell_list != None:
+                    cell_num = random.choice(cell_list)
+                
+                if cell_num != None:
+                    current_cell = np.array(cell_num)
+                else:
+                    current_cell = np.array([random.randrange(0, self.cellnums),
+                                             random.randrange(0, self.cellnums),
+                                             random.randrange(0, self.cellnums)])
+
+                cell_pos = self.index(current_cell).position
+                cell_bound = cell_pos + self.cellside
+
+
                 starting_pos = np.array([random.uniform(cell_pos[0], cell_bound[0]),
                                         random.uniform(cell_pos[1], cell_bound[1]),
                                         random.uniform(cell_pos[2], cell_bound[2])])                    
@@ -626,17 +716,21 @@ class PolyLattice:
                         issues+=1
                         break # stop checking neighbours
                     
+                   
+
                 # monte carlo check
                 if meanfield == True:
-                    random_num = np.random.uniform(0,1)
                     density = self.index(index_c).densities[self.interactions.typekeys[bead_sequence[0]]-1]
+                    
+                    # limit detection
+                    limit = self.interactions.limits[bead_sequence[0]]
+                    if density < limit:
+                        issues+=1 
+                    
+                    # mc acceptance
+                    random_num = np.random.uniform(0,1)
                     if random_num > density:
                         issues+=1
-
-                if density_mc == True:
-                    random_num = np.random.uniform(0,1)
-                    box_density = self.num_beads/self.boxsize**3
-                    cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
 
                 if issues > 0:                    
                     invalid_start = True
@@ -651,6 +745,12 @@ class PolyLattice:
                             if suppress == False:
                                 print(f"Failure tolerance reached at random walk {self.num_walks}.")
                                 print(f"Softening minimum requirement. Current minima: {mini}")
+
+                        if mini < danger and cell_list != None:
+                            mini = 1.12234
+                            cell_num = random.choice(cell_list)
+                            print("Finding new starting cell in provided cell list.")
+                            
 
                         else:
                             total_failure = True
@@ -688,25 +788,39 @@ class PolyLattice:
 
         danger_mode = False
         retraction_count = 0
+        current_block = 0 # this is the index of bcp_specs
+        region = 1
+        
         while i < numbeads:            
             too_close = True # used to check if the cell is too close
             generation_count = 0 # this counts the number of random vectors generated.
                                  # used to raise error messages
-                
-            # manually slice the list and build a subsequence from which the first bead is that of the current index
-            #            bead_subseq = [bead_sequence[(i+j)%len(bead_sequence)] for j in range(sequence_range) 
-            #                           if (i+j) < last_element else bead_sequence[(last_element+j)%len(bead_sequence)]
 
-            last_element = len(bead_sequence) - sequence_range-1 # the last element before the subsequence terminates
-            bead_subseq = []                 
 
-            for j in range(sequence_range):
-                if i+j > last_element:
-                    bead_subseq.append(bead_sequence[(last_element+j)])
-                else:
-                    bead_subseq.append(bead_sequence[(i+j)])
-                    
+            # -------------------------------------------------------------------------------------------------
+            # Who am I? Where am I going?
+            # -------------------------------------------------------------------------------------------------
+            bead_type = bead_sequence[i]                    
+            next_type = bcp_specs[current_block][0][1] # this will be the next region
+
+            if meanfield == True:
+                # the allowed range calcuated using bcp_analyze and the allowed_range function
+                allowed_range = weights[i]            
+
+                # store the current densities in here: all densities are required.
+                current_densities = self.index(current_cell).densities            
+
+                # the density of the *c*urrent bead and the density of the *n*ext type of bead
+                cdensity = current_densities[self.interactions.typekeys[bead_type]-1]
+                ndensity = current_densities[self.interactions.typekeys[next_type]-1]
+
+                # the current range CAN be negative.
+                current_range = cdensity - ndensity
+            # -------------------------------------------------------------------------------------------------
+
             while too_close:
+                # calculate the bead subsequence            
+                # MAIN LOOP -----------------------------------------------------------------------------------------------
                 # loop works like this:
                 #    0. generates trial position
                 #    1. generates a list of beads in neighbouring cell for this trial position
@@ -733,7 +847,6 @@ class PolyLattice:
                 previous = current_pos
                 current_pos = trial_pos
                 
-                bead_type = bead_subseq[0]
 
                 neighbours = self.check_surroundings(current_pos)
                 issues = 0
@@ -759,16 +872,130 @@ class PolyLattice:
                     
                 # monte carlo check
                 if meanfield == True:
-                    random_num = np.random.uniform(0,1)
-                    avg_density = sum([self.index(index_c).densities[self.interactions.typekeys[i]-1] for i in bead_subseq])/len(bead_subseq)
-                    if random_num > avg_density:
-                        issues+=1
+                    # checks if the bead is limited to any given region.
+                    # this is experimental. However, it could be pretty useful!
+                    limit = self.interactions.limits[bead_type]                
+                    if density < limit:
+                        issues+=1 
 
-                if density_mc == True:
-                    random_num = np.random.uniform(0,1)
-                    box_density = self.num_beads/self.boxsize**3
-                    cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
-                    
+                    # ----------------------------------------------------------------------------------------
+                    # MC meanfield check
+                    # ----------------------------------------------------------------------------------------
+                    # Descripton of the algorithm:
+                    # There are three regions of the random walk in which different biases are applied.
+                    #                    
+                    # REGION 1: The push region. Here, we want to push the random walk into a place with higher 
+                    #           density of the same type.
+                    # REGION 0: The NORMAL region. Here, we should only push our region to a higher density of
+                    #           the same type if the density difference is less than 0 (which indicates that we
+                    #           are in a region that is more blue than red.)
+                    # REGION -1: The push region. Here, we want to push the random walk into a place with higher 
+                    #           density of the next occuring type in the chain. However, if the difference in
+                    #           density is less than zero, we don't do any pushing at all.
+                                  
+                    if i <= boundaries[current_block][0]:
+                        # push to a region with higher density of SAME type
+                        region = 1
+                    if i >= boundaries[current_block][1]:
+                        # push to a region with higher density of DIFFERENT type
+                        region = -1
+                    if i > boundaries[current_block][0] and i < boundaries[current_block][1]:
+                        # the anarchist region: no pushing or pulling
+                        region = 0
+
+                    # These regions are used to control the strength of the MC move applied.
+                    # Strong move: If the density difference of the trial region is favorable, accept it straight
+                    #              away. Essentially, SKIP the MC for density.
+                    #              If the density difference of the trial region is unfavorable, apply the weak 
+                    #              move.
+                    # Weak move:   Simply apply the standard density random walk test. 
+                    # ------------------------------------------------------------------------------------------
+                    # Conditions for strong and weak moves 
+                    # ------------------------------------------------------------------------------------------
+                    # When in Region 1, apply strong move and push towards the SAME type of bead ONLY when:
+                    #  * the density difference is LESS than the allowed range.
+                    #  * the density difference is negative.
+                    # Otherwise, apply weak move.
+                    if region == 1:
+                        # region == 1 -> push to a denser SAME TYPE region.
+                        if current_range > 0:
+                            if current_range > allowed_range:
+                                nudge = "No nudge"
+                                # apply basic MC scheme
+                                random_num = np.random.uniform(0,1)                
+                                trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                                if random_num > trial_density:
+                                    issues+=1        
+                        
+                                else:
+                                    # apply strong MC scheme: does not activate if trial_density < cdensity.
+                                    nudge = "NUDGE"
+                                    trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                                    if trial_density < cdensity:
+                                        # the proposed cell is less dense than current cell.
+                                        # apply the basic scheme.
+                                        random_num = np.random.uniform(0,1)                
+                                        if random_num > trial_density:
+                                            issues+=1
+                                        
+                        else:
+                            nudge = "NUDGE"
+                            trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                            if trial_density < cdensity:
+                                # the proposed cell is less dense in the current bead than current cell.
+                                # apply the basic scheme.
+                                random_num = np.random.uniform(0,1)
+                                if random_num > trial_density:
+                                    issues+=1
+
+
+                    # When in Region -1, apply strong move and push towards the NEXT type of bead ONLY when:
+                    #  * the density difference is MORE than the allowed range.
+                    # Otherwise, apply weak move
+                    if region == -1:
+                        if current_range < allowed_range:
+                            nudge = "No nudge"
+                            # apply basic MC scheme
+                            trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                            random_num = np.random.uniform(0,1)                
+                            if random_num > trial_density:
+                                issues+=1
+                        else:
+                            nudge = "NUDGE" # to next bead
+                            trial_density = self.index(index_c).densities[self.interactions.typekeys[next_type]-1]
+                            if trial_density < ndensity:
+                                # the proposed cell is less dense than current cell.
+                                # apply the basic scheme.
+                                trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                                random_num = np.random.uniform(0,1)
+                                if random_num > trial_density:
+                                    issues+=1
+
+
+                    # When in Region 0, apply strong move and push towards the SAME type of bead ONLY when:
+                    #  * the density difference is negative.                    
+                    if region == 0:
+                        # use the normal monte-carlo rule.
+                        if current_range > 0:
+                            nudge = "No nudge"
+                            trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                            # apply basic MC scheme
+                            random_num = np.random.uniform(0,1)                
+                            if random_num > trial_density:
+                                issues+=1        
+                                        
+                        else:
+                            nudge = "NUDGE"
+                            trial_density = self.index(index_c).densities[self.interactions.typekeys[bead_type]-1]
+                            if trial_density < cdensity:
+                                # the proposed cell is less dense in the current bead than current cell.
+                                # apply the basic scheme.
+                                random_num = np.random.uniform(0,1)
+                                if random_num > trial_density:
+                                    issues+=1
+
+                # print(f"{i}\t{bead_type}\t{region}\t{np.round(current_range, 5)}\t\t{np.round(allowed_range, 5)}\t\t{nudge}")
+
                 if issues > 0:      
                     too_close = True
                     current_pos = previous
@@ -852,8 +1079,6 @@ class PolyLattice:
                                             theta=theta,
                                             cell_num=cell_num, 
                                             starting_pos=list(starting_pos),
-                                            sequence_range = sequence_range,
-                                            density_mc=density_mc,
                                             meanfield=meanfield,
                                             end_pos=end_pos,
                                             soften=soften, 
@@ -943,7 +1168,11 @@ class PolyLattice:
             self.num_beads += 1
             self.index(current_cell).beads.append(bead_data)
 
+            self.index(current_cell).energy += energy
+
             i+=1
+            if i > bcp_specs[current_block][1][1]:
+                current_block+=1
 
         self.num_walks += 1
         self.num_bonds += numbeads - 1
@@ -955,7 +1184,7 @@ class PolyLattice:
     def graft_chain(self, starting_bead, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, 
                     starting_distance = None,
                     style='fene', phi=None, theta=None, cell_num=None,
-                    density_mc = None, meanfield=False,
+                    meanfield=False,
                     soften=True, srate=0.99, suppress=False,
                     sequence_range = 1,
                     termination='soften', danger=0.6,
@@ -1203,11 +1432,6 @@ class PolyLattice:
                     avg_density = sum([self.index(index_c).densities[self.interactions.typekeys[i]-1] for i in bead_subseq])/len(bead_subseq)
                     if random_num > avg_density:
                         issues+=1
-
-                if density_mc == True:
-                    random_num = np.random.uniform(0,1)
-                    box_density = self.num_beads/self.boxsize**3
-                    cell_density = len(neighbours)/(27*(self.boxsize**3)/self.celltotal)
                     
                 if issues > 0:      
                     too_close = True
@@ -1845,28 +2069,43 @@ ed.
                       initial_failures=10000, walk_failures=10000,
                       sequence_range = 1,
                       retraction_limit = 10,
+                      halfpoint=False,
+                      dlist=None,
                       meanfield=False, soften=True,):
-        # pick the index of a random bead in walk
 
-        index = random.randrange(sequence_range,size-sequence_range)
-            
+        # arguments:
+        # dlist = a list containing ideal places to start the first part of the random walk
+
+        if halfpoint==True:
+            index = size//2
+        else:
+            # pick the index of a random bead in walk
+            index = random.randrange(sequence_range,size-sequence_range)
 
         # generate the full list, and then split it apart at index i
         full_list = [bead_sequence[i%len(bead_sequence)] for i in range(size)]
         list1 = [full_list[i] for i in range(index)]
         list2 = [full_list[i] for i in range(index, size)]
-        
+
+        if dlist == None:            
+            cellnum = None
+        else:
+            if len(dlist) == 0:
+                print("Empty list provided for density list. Reverting to random cell picking.")
+                cellnum = None
+            else:
+                cellnum = random.choice(dlist) 
+
         if sequence_range > len(list1):
             l1seq = len(list1)
         else:
             l1seq = sequence_range
 
-
         if sequence_range > len(list2):
             l2seq = len(list2)
         else:
             l2seq = sequence_range
-        
+
         # generate the SECOND list into a random walk
         self.randomwalk(len(list2),
                         rw_kval,
@@ -1874,6 +2113,7 @@ ed.
                         rw_epsilon,
                         rw_sigma,
                         list2,
+                        cell_num = cellnum,
                         termination=termination,
                         meanfield=meanfield,
                         soften=True,
@@ -2107,3 +2347,31 @@ ed.
     
 
     # ----------------------------- END OF CLASS ----------------------------
+
+
+
+#-------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------
+# 
+# The code below was the initially employed technique to make sure that the beads were travelling to an
+# appropriate region. (this was below the "mean_field == True" condition)
+# It didn't work. However, it could be pretty useful?
+# 
+# bead_subseq = []                 
+# manually slice the list and build a subsequence from which the first bead is that of the current index
+#            bead_subseq = [bead_sequence[(i+j)%len(bead_sequence)] for j in range(sequence_range) 
+#                           if (i+j) < last_element else bead_sequence[(last_element+j)%len(bead_sequence)]
+# for j in range(sequence_range):
+
+# last_element = len(bead_sequence) - sequence_range-1 # the last element before
+#                                                      # the subsequence terminates
+#     if i+j > last_element:
+#         bead_subseq.append(bead_sequence[(last_element+j)])
+#     else:
+#         bead_subseq.append(bead_sequence[(i+j)])
+# assumed_type = random.choice(bead_subseq)
+# sub_densities = [self.index(index_c).densities[self.interactions.typekeys[i]-1] for i in bead_subseq]
+# avg_density = sum(sub_densities)/len(bead_subseq)
+# ------------------------------------------------------------------------------
+# desnity of the cell in which the trial position resides

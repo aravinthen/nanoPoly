@@ -18,8 +18,10 @@ class Structure:
         def __init__(self, max_dist):
             self.types = {}
             self.typekeys = {}
+            self.limits = {}
+
             self.type_matrix = None
-        
+
             self.sigma_matrix = None   # distances between types
             self.energy_matrix = None  # interaction energies between types
             self.cutoff_matrix = None  # cutoff between types
@@ -53,8 +55,8 @@ class Structure:
                     raise TypeError("No other types have been defined in the system.")
                 self.types[type_id] = mass
                 self.typekeys[type_id] = self.num_types+1
-                self.type_matrix = np.array([f"{type_id},{type_id}"])
-            
+
+                self.type_matrix = np.array([f"{type_id},{type_id}"])            
                 self.sigma_matrix = np.array([potential[0]])
                 self.energy_matrix = np.array([potential[1]])
                 self.cutoff_matrix = np.array([potential[2]])
@@ -69,11 +71,13 @@ class Structure:
                     self.lmbda_matrix = np.array([1])
                 
                 self.num_types+=1
+                self.limits[type_id] = 0.0
                 
             else:
                 self.types[type_id] = mass
                 self.typekeys[type_id] = self.num_types+1
                 self.num_types+=1
+                self.limits[type_id] = 0.0
             
                 # modify the type matrix
                 type_matrix = np.empty((self.num_types,self.num_types), dtype=np.dtype('U50'))
@@ -189,7 +193,7 @@ class Structure:
                     # now with the array indices, simply slot everything into place.
                     self.sigma_matrix[ri[0], rj[0]] = properties[0]
                     self.sigma_matrix[ni[0], nj[0]] = properties[0]
-                    
+
                     self.energy_matrix[ri[0], rj[0]] = properties[1]
                     self.energy_matrix[ni[0], nj[0]] = properties[1]
                     
@@ -311,7 +315,12 @@ class Structure:
             self.lmbda_matrix[ni,nj] = new_val
             self.lmbda_matrix[nj,ni] = new_val
 
-    #---------------------------------------------------------------------------------------
+        #---------------------------------------------------------------------------------------
+        def assign_limit(self, beadtype, limit):
+            self.limits[beadtype] = limit
+            
+        #---------------------------------------------------------------------------------------
+
         def pw_energy(self, particles, index1, index2, xdim, ydim, zdim):
             """
             Calculates a pairwise energy between two particles in a system
@@ -671,5 +680,3 @@ class Structure:
             # Obtain the number fraction of the A block
 
             # Calculate the Flory Huggins parameter via the formula in Chremos, Nikoubashman and Panagiotopolous
-
-

@@ -807,9 +807,7 @@ write_restart   restart.{self.file_name}.polylattice{self.equibs}\n\
         if damp==None:
             damp=100*timestep
         
-        f.write(f"\
-run             0            \n\
-")
+
         if dump>0:
             self.dumping = 1
             self.global_dump = 1
@@ -864,7 +862,7 @@ variable        var_{i} equal \"{i}\"              \n\
 
             file_name = self.file_name+ "-" +str(self.deform_count) 
             f.write(f"\
-            fix             datafile all print {output_steps} {file_string} file {file_name}.deform.data title {title} screen no \n\
+fix             datafile all print {output_steps} {file_string} file {file_name}.deform.data title {title} screen no \n\
 ")
             
         f.write(f"\
@@ -892,7 +890,127 @@ unfix datafile \n\
 ")
         # increment deformation count
         self.deform_count += 1
-            
+
+    def relax(self, eachstep, timestep, 
+              stressdims, temp,
+              loop=100,
+              damp=None, 
+              datafile=True, remap=True,
+              output_steps=100, dump=0, reset=True,
+              Nevery = 2 , Nrepeat = 10 , Nfreq = 100,
+              data=('step','temp','lx', 'ly', 'lz', 'pxx','pyy', 'pzz',),
+              seed=random.randrange(0,99999),
+              description = None):
+        """
+        Carries out a relaxation of the box: essentially, deforms towards the original configuration (specified) until
+        the stress acting on the box is equal to zero.
+        This is encapsulated within an if-jump loop.
+
+        Paramters:
+        stressdims: a list of lists, with each sublist including "
+        """
+        if not self.set_settings:
+            self.equibs-=1
+            raise Exception("Settings have not yet been defined.") 
+
+        if damp==None:
+            damp=100*timestep
+
+        f = open(self.file_name, 'a')
+        f.write(f"\n\
+#---------------------------------------------------------------------------------------------------------\n\
+# RELAXATION STAGE                                                                                       \n")
+        if description != None:
+            self.lmp_sim_init += f"# Description: {description}\n"
+
+        f.write("\
+#---------------------------------------------------------------------------------------------------------\n\
+")
+        data_string = " ".join(data)    
+        if datafile==True:
+            self.data_production = 1
+            title = "\"" + "\t".join(data) + "\""
+            for i in data:
+                f.write(f"\
+variable        var_{i} equal \"{i}\"              \n\
+")
+            file_string = "\"${var_"+ "}\t${var_".join(data) + "}\""
+            file_name = self.file_name+ "-" +str(self.deform_count) 
+            f.write(f"\
+fix             datafile all print {output_steps} {file_string} file {file_name}.deform.data title {title} screen no \n\
+")        
+
+        if dump>0:
+            self.dumping = 1
+            self.global_dump = 1
+            f.write(f"\
+dump            1 all cfg {dump} dump.{self.file_name}_*.cfg mass type xs ys zs fx fy fz c_1[1] c_1[2] c_1[3]\n\
+")
+
+        dims = ['x', 'y', 'z']
+
+        deformation_string = ""
+        justdims = [i[0] for i in stressdims]
+        for d in dims:
+            if d in justdims:
+                strainrate = [i[1] for i in stressdims if i[0]==d][0]
+                deformation_string += f"{d} trate {strainrate} "
+            else:
+                deformation_string += f"{d} volume "
+        
+        f.write(f"\
+velocity        all create {float(temp)} 1231 \n\
+fix             1 all langevin {float(temp)} {float(temp)} {damp} {seed} \n\
+fix             2 all nve/limit {np.amax(self.polylattice.interactions.cutoff_matrix)}\n\
+fix		3 all deform 1 {deformation_string} \n\
+")  
+
+        # ----------------------------------------------------------------------------------------------
+        # The loop
+        # ----------------------------------------------------------------------------------------------        
+        ifcond = "\"${STRESS} > 0.0\" then \"jump SELF break\""
+        fdata_str = data_string + " f_4"
+        f.write(f"\n\
+variable        pressure equal pxx                            \n\
+fix             4 all ave/time {Nevery} {Nrepeat} {Nfreq} v_pressure           \n\
+variable        STRESS equal f_4                              \n\
+thermo_style    custom {fdata_str}                            \n\
+thermo          {output_steps}                                \n\
+label           loop                                          \n\
+variable        a loop {loop}                                 \n\
+run             {eachstep}                                    \n\
+if              {ifcond}                                      \n\
+next            a                                             \n\
+jump            SELF loop                                     \n\
+label           break                                         \n\
+print           \"Relaxation concluded.\"                     \n\
+unfix           4                                             \n\
+\n")  
+
+        # ----------------------------------------------------------------------------------------------
+        if reset == True:
+            f.write(f"\
+reset_timestep  0\n\
+")
+        f.write(f"\
+unfix 1                                                \n\
+unfix 2                                                \n\
+unfix 3                                                \n\
+")
+        if self.dumping == 1:
+            self.dumping = 0
+            f.write(f"\
+undump 1        \n\
+")
+        if datafile == True:
+            f.write(f"\
+unfix datafile \n\
+")
+        # increment deformation count
+        self.deform_count += 1
+
+
+
     def run(self, folder=None, lammps_path= None, mpi=0):
         """
         Carries out the LAMMPS run.

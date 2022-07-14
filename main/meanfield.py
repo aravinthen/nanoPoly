@@ -23,13 +23,30 @@ class MeanField:
         self.guessed = False
         self.unit = None
 
+        self.fhparams = {}
+        self.num_fh = 0
+
+
+        self.max_dranges = {} # the biggest difference within density values per cell
+
+    def setFL(self, type1, type2, fl):
+        # sets the flory huggins parameters for a pair of beads
+        # entry exists for both a,b and b,a. This is lazy, but it works
+        pair1 = (self.polylattice.interactions.typekeys[type1]-1, self.polylattice.interactions.typekeys[type2]-1)
+        pair2 = (self.polylattice.interactions.typekeys[type2]-1, self.polylattice.interactions.typekeys[type1]-1)
+
+        self.fhparams[pair1] = fl
+        self.fhparams[pair2] = fl
+
+        self.num_fh += 1
+        
+
 #--------------------------------------------------------------------------------------------------
 # Problem initialisation
 #--------------------------------------------------------------------------------------------------
     def parameters(self,
                    pname,
                    unit,
-                   chi,
                    crystal,
                    chain_step,
                    group_name,                   
@@ -47,9 +64,10 @@ class MeanField:
         # chain_step   - this should be the inverse of the number of beads in a chain
         # *args        - the number and details of chains in the system
 
+        if self.num_fh == 0:
+            raise SystemError("Flory-Huggins parameters must be defined for all types.")
 
         num_chains = len(args)
-        chi = format(chi, "E")
         chain_step = format(chain_step, "E")
 
         for i in range(3):
@@ -164,8 +182,30 @@ INTERACTION                                                            \n\
 interaction_type                                                       \n\
           'chi'                                                        \n\
 chi                                                                    \n\
-        {chi}                                                          \n\
-                                                                       \n\
+")
+  
+        num_types = self.polylattice.interactions.num_types
+
+        # building a list of type pairs
+        types_list = []
+        for i in range(num_types):
+            for j in range(i+1, num_types):
+                types_list.append((i,j))
+
+        ftypes_list = [] # the actual list of types
+        for i in types_list:
+            if i not in ftypes_list and (i[1], i[0]) not in ftypes_list:
+                ftypes_list.append(i)
+
+        # putting the types in the correct printing format
+        for i in range(1,num_types):    
+            print_list = []
+            for j in ftypes_list:
+                if i in j and all(k<i+1 for k in j):
+                    print_list.append(str(format(float(self.fhparams[j]), "E")))
+            chi = "\t".join(print_list)
+            f.write(f"\
+            {chi}                                                          \n\
 ")
 
         f.write(f"                                                     \n\
@@ -313,6 +353,12 @@ finish                                             \n\
         # this process essentially finds the array indices of the line-by-line density file.
         # first argument is the index of the density box
         # second argument is the density at said box.
+        numtypes = self.polylattice.interactions.num_types
+        density_difference = {}
+        for i in range(numtypes):
+            for j in range(i+1, numtypes):
+                density_difference[(i,j)] = 0.0
+                
         with open(density_file, 'r') as f:
             x = 0
             y = 0
@@ -338,6 +384,12 @@ finish                                             \n\
                     continue
 
                 density_data = np.array([float(i) for i in datum])                    
+                for i in range(numtypes):
+                    for j in range(i+1, numtypes):
+                        diff = abs(density_data[i] - density_data[j])
+                        if diff > density_difference[(i,j)]:
+                            density_difference[(i,j)] = diff
+
                 unit_index.append([[x,y,z], density_data])
                
                 x+=1                
@@ -350,6 +402,19 @@ finish                                             \n\
                     z += 1
                     
                 count+=1
+
+        
+        inv_types = dict((v-1, k) for k, v in self.polylattice.interactions.typekeys.items())
+        for i in density_difference:
+            self.max_dranges[(inv_types[i[1]],
+                              inv_types[i[0]])] = density_difference[i]
+            self.max_dranges[(inv_types[i[0]],
+                              inv_types[i[1]])] = density_difference[i]
+
+        # for self-ranges, just use max difference.
+        for i in range(numtypes):
+            self.max_dranges[(inv_types[i],
+                              inv_types[i])] = 1.0
 
         num_types = np.size([unit_index[0][-1]])
         density_fields = [np.zeros(unit) for i in range(num_types)]
@@ -375,3 +440,46 @@ finish                                             \n\
         print(f"{count} density values read into box.")
         
         self.density = True
+
+
+    # ----------------------------------------------------------------------------------------------
+    def density_search(self, beadtype, upper):
+        # returns the list of cell indices that have a minimum of a specified
+        good_spots = []
+        for i in range(self.polylattice.cellnums):
+            for j in range(self.polylattice.cellnums):
+                for k in range(self.polylattice.cellnums):
+                    cell = [i,j,k]
+                    density = self.polylattice.index(cell).densities[self.polylattice.interactions.typekeys[beadtype]-1]
+                    if density >= upper:
+                        good_spots.append(cell)
+
+        return good_spots
+
+    def density_eval(self, position):
+        current_cell = self.polylattice.which_cell(position)
+        surround_ind = ([(current_cell[0]+i)%self.polylattice.cellnums,
+                         (current_cell[1]+j)%self.polylattice.cellnums,
+                         (current_cell[2]+k)%self.polylattice.cellnums] for i in range(-1,2) for j in range(-1,2) for k in range(-1,2))
+
+        region_ds = [0.0 for i in range(self.polylattice.interactions.num_types)]
+        for ind in surround_ind:
+            for i in range(self.polylattice.interactions.num_types):
+                region_ds[i] += self.polylattice.index(ind).densities[i]
+
+        return np.array(region_ds)/(len(region_ds)-1)
+            
+        
+    def assign_limit(self, beadtype, limit):
+        valid_cells = 0
+        for i in range(self.polylattice.cellnums):
+            for j in range(self.polylattice.cellnums):
+                for k in range(self.polylattice.cellnums):
+                    cell = [i,j,k]
+                    density = self.polylattice.index(cell).densities[self.polylattice.interactions.typekeys[beadtype]-1]
+                    if density >= limit:
+                        valid_cells += 1
+
+        print(f"Fraction of box available for type {beadtype}: {valid_cells/(self.polylattice.cellnums)**3}")
+
+        self.polylattice.interactions.assign_limit(beadtype, limit)
