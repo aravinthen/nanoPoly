@@ -337,9 +337,11 @@ class PolyLattice:
                    meanfield=False,
                    end_pos=None,
                    soften=True, srate=0.99, suppress=False, danger = 1.0,
-                   width=[0.4,0.6], depth=0.0,
+                   widths=None, 
+                   depths=None,
                    retraction_limit = 10,
-                   termination='soften', initial_failures=10000, walk_failures=10000):
+                   termination='soften', initial_failures=10000, walk_failures=10000,
+                   history=False):
         """index_c
         Produces a random walk.
         If cell_num argument is left as None, walk sprouts from a random cell.
@@ -363,6 +365,8 @@ class PolyLattice:
         OPTION -    grafting: used if the generated random walk will be grafted onto something.
         OPTION -    srate: the rate at which the minimum distance requirement softens
         OPTION -    sequence_range: the range at which a bead's type is selected when running mc-biased random walks
+        OPTION -    history: prints the density difference history of a into a file. 
+                             used for visualisation purposes.
                     
         Notes: Nested functions prevent the helper functions from being used outside of scope.       
         """        
@@ -376,6 +380,10 @@ class PolyLattice:
 
         if self.meanfield.density != True and meanfield != False:
             raise EnvironmentError("Density file has not been assigned.")
+
+        if self.meanfield.density == True and cell_list==None:
+            print("\nWARNING: It is highly recommended to use density_search() to find good positions to start")
+            print("the random walk. This will typically provide better results.\n")
 
         if srate == 1.0:
             print("Setting srate to unity means that the softening rate of the potential will stay the same.")
@@ -523,7 +531,7 @@ class PolyLattice:
 
             return block_indices, number_of_blocks 
 
-        def allowed_range(block, max_range, initial_range, frac=width):
+        def allowed_range(block, max_range, initial_range, frac):
             # converts a bcp into a range of density differences.
             # block must have the following format:
             # a) [(type1, type2), (ind1, ind2)]
@@ -560,13 +568,32 @@ class PolyLattice:
 
         # copolymer information: find the ranges 
         bcp_specs, num_blocks = bcp_analyze(bead_sequence)
-        weights = []
-        boundaries = []
 
-        for block in bcp_specs:
+        
+        if history==True:
+            history_file = open(f"history_{self.num_walks}", "w")
+
+        if widths==None:
+            widths =[[0.4,0.6] for i in range(num_blocks)]
+
+        if depths==None:
+            depths =[0.0 for i in range(num_blocks)]
+
+        if len(widths) != num_blocks:
+            print(f"Not enough widths entered for polymer chain [{len(widths)} instead of numblocks]")
+            print("Reverting to default.")
+            widths =[[0.4,0.6] for i in range(num_blocks)]
+
+        weights = []
+        boundaries = [] # the full list of boundaries based on the widths
+        for count, block in enumerate(bcp_specs):
             type1 = block[0][0]
             type2 = block[0][1]
-            alrange = allowed_range(block, self.meanfield.max_dranges[(type1, type2)], depth)
+            alrange = allowed_range(block, 
+                                    self.meanfield.max_dranges[(type1, type2)],
+                                    depths[count],
+                                    frac=widths[count])
+
             weights += alrange[0]
             boundaries.append(alrange[1])
 
@@ -816,6 +843,8 @@ class PolyLattice:
 
                 # the current range CAN be negative.
                 current_range = cdensity - ndensity
+
+                history_file.write(f"{i}\t{np.round(allowed_range, 5)}\t{np.round(current_range,5)}\n")
             # -------------------------------------------------------------------------------------------------
 
             while too_close:
@@ -900,8 +929,9 @@ class PolyLattice:
                         # push to a region with higher density of DIFFERENT type
                         region = -1
                     if i > boundaries[current_block][0] and i < boundaries[current_block][1]:
-                        # the anarchist region: no pushing or pulling
+                        # the anarchy region: no pushing or pulling
                         region = 0
+
 
                     # These regions are used to control the strength of the MC move applied.
                     # Strong move: If the density difference of the trial region is favorable, accept it straight
@@ -1179,6 +1209,10 @@ class PolyLattice:
         self.random_walked = True
 
         self.walkinfo[ID] = self.num_walk_beads
+
+        if history==True:
+            history_file.close()
+
         return 1    
     
     def graft_chain(self, starting_bead, numbeads, Kval, cutoff, energy, sigma, bead_sequence, mini=1.12234, 
