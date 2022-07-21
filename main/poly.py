@@ -501,7 +501,7 @@ class PolyLattice:
             # index1: the bead types.
             # index2: the indices of the block
 
-            beadtypes = list[set(bcp)]
+            beadtypes = list(set(bcp))
 
             # stores the information about the current block of the system
             block_indices = []
