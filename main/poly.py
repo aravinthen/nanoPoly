@@ -844,6 +844,7 @@ class PolyLattice:
                 # the current range CAN be negative.
                 current_range = cdensity - ndensity
 
+            if history==True:
                 history_file.write(f"{i}\t{np.round(allowed_range, 5)}\t{np.round(current_range,5)}\n")
             # -------------------------------------------------------------------------------------------------
 
