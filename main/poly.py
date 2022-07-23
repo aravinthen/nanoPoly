@@ -991,6 +991,7 @@ class PolyLattice:
                             random_num = np.random.uniform(0,1)                
                             if random_num > trial_density:
                                 issues+=1
+                            
                         else:
                             nudge = "NUDGE" # to next bead
                             trial_density = self.index(index_c).densities[self.interactions.typekeys[next_type]-1]
@@ -1001,6 +1002,7 @@ class PolyLattice:
                                 random_num = np.random.uniform(0,1)
                                 if random_num > trial_density:
                                     issues+=1
+                                issues +=1
 
 
                     # When in Region 0, apply strong move and push towards the SAME type of bead ONLY when:
@@ -1013,7 +1015,7 @@ class PolyLattice:
                             # apply basic MC scheme
                             random_num = np.random.uniform(0,1)                
                             if random_num > trial_density:
-                                issues+=1        
+                                issues+=1
                                         
                         else:
                             nudge = "NUDGE"
