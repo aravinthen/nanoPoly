@@ -7,6 +7,7 @@ import sys
 import os
 import os.path
 from os import path
+from scipy.interpolate import RegularGridInterpolator
 
 class MeanField:
     """
@@ -26,7 +27,11 @@ class MeanField:
         self.fhparams = {}
         self.num_fh = 0
 
-
+        # these attributes are used for the purpose of interpolation
+        # they aren't necessary in basic applications, so their use is considered optional
+        self.interpolation = False
+        self.density_funcs = None
+        
         self.max_dranges = {} # the biggest difference within density values per cell
 
     def setFL(self, type1, type2, fl):
@@ -442,6 +447,51 @@ finish                                             \n\
         self.density = True
 
 
+    def interpolate(self,):
+        # creates interpolation functions based on the density information within the walk
+        # It is necessary for a density file to be read into the system before this can be done!
+
+        # error messages
+        if self.density == False:
+            raise SystemError("A density file must be read into the box first!")
+
+        # obtain the mesh data
+        init_size = self.polylattice.cellnums # the actual size of the box
+
+        # these define the points along the axes upon which the interpolation is defined.
+        x = np.array([(0.5+i)*self.polylattice.cellside for i in range(-1, init_size+1)])
+        y = np.array([(0.5+i)*self.polylattice.cellside for i in range(-1, init_size+1)])
+        z = np.array([(0.5+i)*self.polylattice.cellside for i in range(-1, init_size+1)])
+
+        # build a mesh-grid with the density values
+        # the meshgrid has to be a bit larger than normal in order to interpolate at higher values.
+
+        # this is a list that contains N meshgrids, where N is the number of types within the system.
+        densities = [np.zeros([init_size+2,
+                               init_size+2,
+                               init_size+2]) for i in range(-1, self.polylattice.interactions.num_types)]
+
+        for i in range(-1, init_size+1):
+            for j in range(-1, init_size+1):
+                for k in range(-1, init_size+1):
+                    for val in range(self.polylattice.interactions.num_types):
+                        xv = i % init_size
+                        yv = j % init_size
+                        zv = k % init_size
+                        densities[val][xv,yv,zv] = self.polylattice.index([xv,yv,zv]).densities[val]
+
+        # create a dictionary for each type that contains an interpolator function
+        density_funcs = {}
+        for i in range(self.polylattice.interactions.num_types):
+            density_function = RegularGridInterpolator((x, y, z), densities[i])
+            # note that i+1 corresponds to the enumerated types found in interactions.typekeys
+            density_funcs[i+1] = density_function # this can now be called as any standard function
+
+        self.density_funcs = density_funcs
+        # set interpolated to true: to be used in random walk functions
+        self.interpolated = True
+
+        
     # ----------------------------------------------------------------------------------------------
     def density_search(self, beadtype, upper):
         # returns the list of cell indices that have a minimum of a specified

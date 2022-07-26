@@ -16,7 +16,12 @@ class Structure:
     class Interactions:
         """All the interactions between beads are stored here."""
         def __init__(self, max_dist):
+            # self.types contains a list of types as well as the masses associated.
+            # if you want to cycle through the bead types, treat self.types as a list.
             self.types = {}
+
+            # self.typekeys associates the types of the system with a dictionary key.
+            # used extensively when reading data
             self.typekeys = {}
             self.limits = {}
 
