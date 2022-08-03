@@ -341,6 +341,7 @@ class PolyLattice:
                    depths=None,
                    retraction_limit = 10,
                    termination='soften', initial_failures=10000, walk_failures=10000,
+                   interpolation = False,
                    history=False):
         """index_c
         Produces a random walk.
@@ -380,6 +381,9 @@ class PolyLattice:
 
         if self.meanfield.density != True and meanfield != False:
             raise EnvironmentError("Density file has not been assigned.")
+
+        if interpolation == True and self.meanfield.interpolated == False:
+            raise EnvironmentError("Interpolation has not yet been carried out.")
 
         if self.meanfield.density == True and cell_list==None:
             print("\nWARNING: It is highly recommended to use density_search() to find good positions to start")
@@ -824,9 +828,9 @@ class PolyLattice:
                                  # used to raise error messages
 
 
-            # -------------------------------------------------------------------------------------------------
+            # -----------------------------------------------------------------------------------------
             # Who am I? Where am I going?
-            # -------------------------------------------------------------------------------------------------
+            # -----------------------------------------------------------------------------------------
             bead_type = bead_sequence[i]                    
             next_type = bcp_specs[current_block][0][1] # this will be the next region
 
@@ -834,12 +838,20 @@ class PolyLattice:
                 # the allowed range calcuated using bcp_analyze and the allowed_range function
                 allowed_range = weights[i]            
 
-                # store the current densities in here: all densities are required.
-                current_densities = self.index(current_cell).densities            
+                ctype = self.interactions.typekeys[bead_type]
+                ntype = self.interactions.typekeys[next_type]
+                
+                if interpolation == True:
+                    cdensity = self.meanfield.density_funcs[ctype](current_pos)[0]
+                    ndensity = self.meanfield.density_funcs[ntype](current_pos)[0]
+                    
+                else:
+                    # store the current densities in here: all densities are required.
+                    current_densities = self.index(current_cell).densities            
 
-                # the density of the *c*urrent bead and the density of the *n*ext type of bead
-                cdensity = current_densities[self.interactions.typekeys[bead_type]-1]
-                ndensity = current_densities[self.interactions.typekeys[next_type]-1]
+                    # the density of the *c*urrent bead and the density of the *n*ext type of bead
+                    cdensity = current_densities[ctype-1]
+                    ndensity = current_densities[ntype-1]
 
                 # the current range CAN be negative.
                 current_range = cdensity - ndensity

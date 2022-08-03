@@ -29,7 +29,7 @@ class MeanField:
 
         # these attributes are used for the purpose of interpolation
         # they aren't necessary in basic applications, so their use is considered optional
-        self.interpolation = False
+        self.interpolated = False
         self.density_funcs = None
         
         self.max_dranges = {} # the biggest difference within density values per cell
@@ -478,7 +478,7 @@ finish                                             \n\
                         xv = i % init_size
                         yv = j % init_size
                         zv = k % init_size
-                        densities[val][xv,yv,zv] = self.polylattice.index([xv,yv,zv]).densities[val]
+                        densities[val][i,j,k] = self.polylattice.index([xv,yv,zv]).densities[val]
 
         # create a dictionary for each type that contains an interpolator function
         density_funcs = {}
